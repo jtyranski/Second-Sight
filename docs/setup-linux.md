@@ -89,7 +89,9 @@ Do these in order with your own avatar logged in nearby. Each line says what to 
 6. **Surroundings:** "What's around DexterFrost?" Check your distance and compass direction (north is up on the map), and that nearby objects have names.
 7. **Inspect:** "What is that <object>?" for one listed object. Check the owner and description.
 8. **Your avatar:** hold something and ask "What am I doing and holding?", then "What am I wearing?". (Needs the avatar perception update.)
-9. **Log out:** "Log the bot out."
+9. **Home:** where the bot may set home, ask Claude to "set DexterFrost's home here", move away, then "teleport home".
+10. **Friends:** ask Claude to "send me a friend request" and accept it. Have an alt send the bot a request: you should get an IM asking you to decide, then tell Claude "accept it" or "decline it". Ask "Who are DexterFrost's friends?", then try "remove <name> from his friends".
+11. **Log out:** "Log the bot out."
 
 ## Activity log
 

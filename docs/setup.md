@@ -126,6 +126,15 @@ Ask Claude "What's around DexterFrost?" or "Where am I compared to the bot?". Cl
 
 Object names come from the region a moment after the bot asks for them, so the first description in a new place can list a few objects as unnamed. Asking again fills them in.
 
+### Home and friends
+
+- **Set home:** stand the bot somewhere it's allowed to set home (your land, or land of a group it belongs to) and ask Claude to "set DexterFrost's home here". Then "teleport home" from somewhere else to check.
+- **Friend request to you:** ask Claude to "send me a friend request". Accept it in your viewer.
+- **Friend request from you:** if you're not friends yet, offer DexterFrost friendship. He accepts right away.
+- **Someone else's request:** have an alt or a friend offer DexterFrost friendship. You get an IM from him asking whether to accept. Tell Claude "accept it" or "decline it".
+- **Friends list:** ask "Who are DexterFrost's friends?".
+- **Remove a friend:** ask Claude to "remove <name> from DexterFrost's friends".
+
 When you're done, ask Claude to log the bot out.
 
 ## Activity log
