@@ -1,0 +1,20 @@
+{
+  // Copy this file to %APPDATA%\SecondSight\config.json and fill it in.
+  // Never commit your real config: it holds the bot's password.
+
+  // The bot account's username.
+  "Username": "SamSecondsight",
+
+  // The bot's password. You can leave this out and set the
+  // SECONDSIGHT_PASSWORD environment variable instead.
+  "Password": "",
+
+  // The only avatar the bot takes direction from. A name or a UUID.
+  "Owner": "Jimmi Tiponi",
+
+  // Where to log in: "last", "home", or "Region Name/x/y/z".
+  "StartLocation": "last",
+
+  // Log in as soon as Claude starts the MCP server.
+  "AutoLogin": false
+}
