@@ -37,7 +37,12 @@ public static class MessageFormatter
         var sb = new StringBuilder();
         sb.Append(CultureInfo.InvariantCulture, $"[{m.Time.ToLocalTime():h:mm tt}] {m.FromName}");
         var details = new List<string>();
-        details.Add(m.Channel == MessageChannel.InstantMessage ? "IM" : "local chat");
+        details.Add(m.Channel switch
+        {
+            MessageChannel.InstantMessage => "IM",
+            MessageChannel.Event => "event",
+            _ => "local chat",
+        });
         if (m.Speaker == SpeakerKind.Object) details.Add("object");
         if (m.Speaker == SpeakerKind.System) details.Add("system");
         if (m.Volume == ChatVolume.Whisper) details.Add("whisper");

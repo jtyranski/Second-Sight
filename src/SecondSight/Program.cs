@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using SecondSight.Core.Chat;
 using SecondSight.Core.Config;
 using SecondSight.Core.Session;
+using SecondSight.Core.Travel;
 
 // stdout carries the MCP protocol, so anything else that writes to Console.Out
 // (including library logging) is sent to stderr instead.
@@ -24,6 +25,7 @@ builder.Services.AddSingleton(sp => new ActivityLog(config.ActivityLogDirectory,
 builder.Services.AddSingleton<BotSession>();
 builder.Services.AddSingleton<IBotSession>(sp => sp.GetRequiredService<BotSession>());
 builder.Services.AddSingleton<IChatChannel>(sp => sp.GetRequiredService<BotSession>());
+builder.Services.AddSingleton<ITravel>(sp => sp.GetRequiredService<BotSession>());
 
 builder.Services
     .AddMcpServer(o => o.ServerInfo = new() { Name = "second-sight", Version = BotSession.Version })

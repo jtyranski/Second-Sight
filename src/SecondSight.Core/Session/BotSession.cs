@@ -2,11 +2,12 @@ using LibreMetaverse;
 using Microsoft.Extensions.Logging;
 using SecondSight.Core.Chat;
 using SecondSight.Core.Config;
+using SecondSight.Core.Travel;
 
 namespace SecondSight.Core.Session;
 
 /// <summary>Owns the LibreMetaverse <see cref="GridClient"/>: login/logout, incoming chat, and sending chat.</summary>
-public sealed class BotSession : IBotSession, IChatChannel, IAsyncDisposable
+public sealed class BotSession : IBotSession, IChatChannel, ITravel, IAsyncDisposable
 {
     public const string Channel = "SecondSight";
     public static readonly string Version = typeof(BotSession).Assembly.GetName().Version?.ToString(3) ?? "0.1.0";
@@ -25,6 +26,7 @@ public sealed class BotSession : IBotSession, IChatChannel, IAsyncDisposable
     private GridClient? _client;
     private volatile ConnectionState _state = ConnectionState.LoggedOut;
     private string? _lastError;
+    private volatile bool _lureTeleportPending;
 
     public BotSession(BotConfig config, MessageInbox inbox, OutgoingLimiter limiter, ActivityLog activity,
         ILogger<BotSession> logger, TimeProvider? time = null)
@@ -104,6 +106,7 @@ public sealed class BotSession : IBotSession, IChatChannel, IAsyncDisposable
             _inbox.Clear();
             client.Self.ChatFromSimulator += OnChat;
             client.Self.IM += OnInstantMessage;
+            client.Self.TeleportProgress += OnTeleportProgress;
             _client = client;
             _state = ConnectionState.LoggedIn;
             _logger.LogInformation("Logged in to {Region}", client.Network.CurrentSim?.Name);
@@ -247,6 +250,7 @@ public sealed class BotSession : IBotSession, IChatChannel, IAsyncDisposable
     {
         var client = _client;
         if (client == null) return;
+        if (HandleLure(client, e.IM)) return;
         var message = MessageClassifier.FromInstantMessage(e.IM, client.Self.AgentID, _owner, _time.GetLocalNow());
         if (message == null)
         {
@@ -258,11 +262,153 @@ public sealed class BotSession : IBotSession, IChatChannel, IAsyncDisposable
         _activity.Write("im-from-owner", message.Text);
     }
 
+    /// <summary>Handles teleport offers and requests. Returns true when the IM was one.</summary>
+    private bool HandleLure(GridClient client, InstantMessage im)
+    {
+        switch (LureDecision.Decide(im, client.Self.AgentID, _owner))
+        {
+            case LureAction.AcceptOffer:
+                _logger.LogInformation("Accepting teleport offer from {Name}", im.FromAgentName);
+                _activity.Write("teleport-accept", $"Accepted teleport offer from {im.FromAgentName}");
+                _lureTeleportPending = true;
+                client.Self.TeleportLureRespond(im.FromAgentID, im.IMSessionID, true);
+                AddEvent($"{im.FromAgentName} sent a teleport offer. Accepted it; teleporting now.");
+                return true;
+
+            case LureAction.DeclineOffer:
+                _logger.LogInformation("Declining teleport offer from {Name} (not the owner)", im.FromAgentName);
+                _activity.Write("teleport-decline", $"Declined teleport offer from {im.FromAgentName}");
+                client.Self.TeleportLureRespond(im.FromAgentID, im.IMSessionID, false);
+                return true;
+
+            case LureAction.SendOfferToOwner:
+                if (_limiter.TryReserve(1, out var reason))
+                {
+                    client.Self.SendTeleportLure(im.FromAgentID, "Join me");
+                    _activity.Write("teleport-offer", $"Sent teleport offer to {im.FromAgentName} (they asked)");
+                    AddEvent($"{im.FromAgentName} asked for a teleport. Sent them a teleport offer to here.");
+                }
+                else
+                {
+                    AddEvent($"{im.FromAgentName} asked for a teleport, but no offer was sent: {reason}");
+                }
+                return true;
+
+            case LureAction.IgnoreRequest:
+                _logger.LogInformation("Ignored teleport request from {Name} (not the owner)", im.FromAgentName);
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
+    private void OnTeleportProgress(object? sender, TeleportEventArgs e)
+    {
+        if (!_lureTeleportPending) return;
+        switch (e.Status)
+        {
+            case TeleportStatus.Finished:
+                _lureTeleportPending = false;
+                _activity.Write("teleported", GetStatus().Describe());
+                AddEvent($"Teleport finished. {GetStatus().Describe()}");
+                break;
+            case TeleportStatus.Failed:
+            case TeleportStatus.Cancelled:
+                _lureTeleportPending = false;
+                _activity.Write("teleport-failed", e.Message);
+                AddEvent($"Teleport failed: {(string.IsNullOrWhiteSpace(e.Message) ? e.Status.ToString() : e.Message)}");
+                break;
+        }
+    }
+
+    /// <summary>Tells Claude something happened that the owner caused.</summary>
+    private void AddEvent(string text) => _inbox.Add(new ChatMessage
+    {
+        Time = _time.GetLocalNow(),
+        Channel = MessageChannel.Event,
+        FromName = "Second Sight",
+        FromId = "",
+        Speaker = SpeakerKind.System,
+        Text = text,
+        FromOwner = true,
+    });
+
+    public async Task<SessionResult> TeleportAsync(TeleportTarget target, CancellationToken cancellationToken)
+    {
+        if (!TryGetClient(out var client, out var notLoggedIn)) return notLoggedIn;
+        _logger.LogInformation("Teleporting to {Target}", target);
+        bool ok;
+        try
+        {
+            ok = await client.Self.TeleportAsync(target.Region, new Vector3(target.X, target.Y, target.Z), cancellationToken);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            _logger.LogWarning(e, "Teleport threw");
+            ok = false;
+        }
+        return TeleportResult(client, ok, $"to {target}");
+    }
+
+    public async Task<SessionResult> GoHomeAsync(CancellationToken cancellationToken)
+    {
+        if (!TryGetClient(out var client, out var notLoggedIn)) return notLoggedIn;
+        bool ok;
+        try
+        {
+            ok = await client.Self.GoHomeAsync(cancellationToken);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            _logger.LogWarning(e, "Teleport home threw");
+            ok = false;
+        }
+        return TeleportResult(client, ok, "home");
+    }
+
+    public Task<SessionResult> OfferTeleportToOwnerAsync(string? message, CancellationToken cancellationToken)
+    {
+        if (!TryGetClient(out var client, out var notLoggedIn)) return Task.FromResult(notLoggedIn);
+        if (_owner.Id is not { } ownerId)
+            return Task.FromResult(new SessionResult(false, $"Can't send {OwnerName} a teleport offer: the owner's UUID isn't known yet."));
+        if (!_limiter.TryReserve(1, out var reason)) return Task.FromResult(new SessionResult(false, reason!));
+
+        var text = string.IsNullOrWhiteSpace(message) ? "Join me" : message.Trim();
+        client.Self.SendTeleportLure(ownerId, text);
+        _activity.Write("teleport-offer", $"Sent teleport offer to {OwnerName}: {text}");
+        var where = client.Network.CurrentSim?.Name ?? "the bot's location";
+        return Task.FromResult(new SessionResult(true, $"Sent {OwnerName} a teleport offer to {where}. They need to accept it in their viewer."));
+    }
+
+    private SessionResult TeleportResult(GridClient client, bool ok, string destination)
+    {
+        if (ok)
+        {
+            var status = GetStatus().Describe();
+            _activity.Write("teleported", status);
+            return new(true, $"Teleported {destination}. {status}");
+        }
+        var why = client.Self.TeleportMessage;
+        if (string.IsNullOrWhiteSpace(why)) why = "no reason given";
+        _activity.Write("teleport-failed", $"{destination}: {why}");
+        return new(false, $"Teleport {destination} failed: {why}. " +
+            "The region may not exist, be full, or block scripted agents (bots).");
+    }
+
+    private bool TryGetClient(out GridClient client, out SessionResult notLoggedIn)
+    {
+        client = _client!;
+        notLoggedIn = new SessionResult(false, "The bot is not logged in. Use the login tool first.");
+        return _client != null && _state == ConnectionState.LoggedIn && _client.Network.Connected;
+    }
+
     private void Detach(GridClient client)
     {
         client.Network.Disconnected -= OnDisconnected;
         client.Self.ChatFromSimulator -= OnChat;
         client.Self.IM -= OnInstantMessage;
+        client.Self.TeleportProgress -= OnTeleportProgress;
     }
 
     private static string DescribeOwner(string owner) =>

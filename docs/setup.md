@@ -102,6 +102,14 @@ To chat, stand near the bot in Second Life and ask Claude something like:
 
 Claude then loops: it calls `wait_for_message`, reads what you said, answers with `say`, and waits again. You can also IM the bot. Claude Desktop asks before each tool call, so choose **Always allow** for the Second Sight tools to keep the conversation flowing.
 
+### Bringing the bot somewhere
+
+- **Bot to you:** right-click DexterFrost (or open his profile) and choose **Offer Teleport**, or IM him a teleport offer. He accepts offers only from you.
+- **You to the bot:** ask Claude to "send me a teleport offer", or use **Request Teleport** on DexterFrost in your viewer. Either way you get an offer to accept.
+- **Somewhere specific:** ask Claude to "teleport to Region Name 128 128 30", or paste a SLURL.
+
+Sandboxes are a good place to experiment. Some regions block bots, and the bot will be refused there.
+
 When you're done, ask Claude to log the bot out.
 
 ## Activity log

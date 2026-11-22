@@ -1,6 +1,12 @@
 namespace SecondSight.Core.Chat;
 
-public enum MessageChannel { LocalChat, InstantMessage }
+public enum MessageChannel
+{
+    LocalChat,
+    InstantMessage,
+    /// <summary>Something that happened to the bot, such as accepting the owner's teleport offer.</summary>
+    Event,
+}
 
 public enum ChatVolume { Whisper, Normal, Shout }
 
