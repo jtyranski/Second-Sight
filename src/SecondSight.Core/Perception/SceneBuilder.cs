@@ -57,22 +57,44 @@ public static class SceneBuilder
     /// <summary>
     /// Avatars in the region other than the bot: the ones the bot can see in full, then the ones it only knows
     /// from the minimap. <paramref name="lookup"/> finds a seat so seated avatars get a region position.
+    /// <paramref name="prims"/> (the region's objects) supplies what visible avatars are wearing, and
+    /// <paramref name="objectName"/> names attachments and the objects that animate avatars.
     /// </summary>
     public static List<SeenAvatar> Avatars(IEnumerable<Avatar> visible, IReadOnlyDictionary<UUID, Vector3>? coarse,
-        UUID self, Func<uint, Primitive?> lookup, Func<UUID, string?>? nameOf = null)
+        UUID self, Func<uint, Primitive?> lookup, Func<UUID, string?>? nameOf = null,
+        IReadOnlyCollection<Primitive>? prims = null, Func<UUID, string?>? objectName = null)
     {
+        objectName ??= _ => null;
+        var attachments = new Dictionary<uint, List<Primitive>>();
+        if (prims != null)
+            foreach (var p in prims)
+                if (p.ParentID != 0)
+                {
+                    if (!attachments.TryGetValue(p.ParentID, out var list)) attachments[p.ParentID] = list = [];
+                    list.Add(p);
+                }
+
         var result = new List<SeenAvatar>();
         var seen = new HashSet<UUID> { self };
         foreach (var a in visible)
         {
             if (!seen.Add(a.ID)) continue;
             var name = string.IsNullOrWhiteSpace(a.Name) ? nameOf?.Invoke(a.ID) : a.Name;
+            var worn = attachments.TryGetValue(a.LocalID, out var mine)
+                ? mine.Select(p => new WornItem(p.ID, Clean(objectName(p.ID)), p.PrimData.AttachmentPoint))
+                    .Where(w => !w.Point.ToString().StartsWith("HUD", StringComparison.Ordinal))
+                    .OrderBy(w => w.Held ? 0 : 1).ThenBy(w => w.Point.ToString(), StringComparer.Ordinal).ToList()
+                : [];
+            List<Animation> animations;
+            lock (a) animations = a.Animations?.ToList() ?? [];
             result.Add(new SeenAvatar
             {
                 Id = a.ID,
                 Name = CleanName(name),
                 Position = Geometry.WorldPosition(a, lookup),
                 Sitting = a.ParentID != 0,
+                Worn = worn,
+                Activity = AvatarActivity.Describe(animations, a.ID, worn, id => Clean(objectName(id))),
             });
         }
         if (coarse != null)

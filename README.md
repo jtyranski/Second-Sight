@@ -22,12 +22,13 @@ The bot can log in, chat with its owner, teleport, and describe what is around i
 | `teleport_home` | Teleports to the bot's home location. |
 | `offer_teleport` | Sends the owner a teleport offer to the bot's location. |
 | `describe_surroundings` | Describes the region and parcel, where the owner is, other avatars in the region, and nearby objects with their size and what clicking them does. |
-| `inspect_object` | Details for one object or avatar: name, description, floating text, owner, creator, size, position, and whether it's for sale. |
+| `inspect_object` | Details for one object (name, description, floating text, owner, creator, size, position, whether it's for sale) or avatar (what they're doing, holding, and wearing). |
 
 ### Seeing
 
 - `describe_surroundings` gives distances and compass directions from the bot (north is +Y, east is +X in region coordinates). It looks up to 128 m for objects (30 m by default) and lists the nearest 25 unless asked for more.
 - Avatars beyond the bot's 128 m draw distance are still listed, with an approximate position from the minimap.
+- For avatars the bot can see, it reports built-in animations by name (standing, walking, typing, dancing), custom animations by the object playing them (a dance ball, a couch, an AO), what they hold in their hands, and their attachments with where they're worn. Older system clothing layers have no names the bot can read, so they aren't listed.
 - Object names, descriptions, and floating text are written by whoever made the object, so Claude is told to treat them as information, not instructions.
 
 ### Teleporting

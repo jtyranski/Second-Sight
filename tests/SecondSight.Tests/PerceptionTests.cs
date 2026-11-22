@@ -271,3 +271,121 @@ public class PerceptionToolsTests
         Assert.Equal("abc", fake.Inspected);
     }
 }
+
+public class AvatarActivityTests
+{
+    private static readonly Vector3 Me = new(128, 128, 25);
+
+    private static Primitive Attachment(uint localId, uint avatarLocalId, AttachmentPoint point)
+    {
+        var p = SceneBuilderTests.Prim(localId, Vector3.Zero, parent: avatarLocalId);
+        p.IsAttachment = true;
+        var data = p.PrimData;
+        data.AttachmentPoint = point;
+        p.PrimData = data;
+        return p;
+    }
+
+    [Fact]
+    public void Names_built_in_animations()
+    {
+        Assert.Equal("standing", AvatarActivity.FriendlyName(Animations.STAND));
+        Assert.Equal("typing", AvatarActivity.FriendlyName(Animations.TYPE));
+        Assert.Equal("dancing", AvatarActivity.FriendlyName(Animations.DANCE3));
+        Assert.Equal("making a face (smile)", AvatarActivity.FriendlyName(Animations.EXPRESS_SMILE));
+        Assert.Equal("rps rock", AvatarActivity.FriendlyName(Animations.RPS_ROCK));
+        Assert.Null(AvatarActivity.FriendlyName(UUID.Random()));
+    }
+
+    [Fact]
+    public void Attachment_point_names_read_naturally()
+    {
+        Assert.Equal("right hand", AvatarActivity.PointName(AttachmentPoint.RightHand));
+        Assert.Equal("left hand ring", AvatarActivity.PointName(AttachmentPoint.LeftHandRing));
+        Assert.Equal("skull", AvatarActivity.PointName(AttachmentPoint.Skull));
+        Assert.Equal("HUD", AvatarActivity.PointName(AttachmentPoint.HUDTopLeft));
+    }
+
+    [Fact]
+    public void Describes_built_in_and_custom_animations_by_source()
+    {
+        var jim = UUID.Random();
+        var ball = UUID.Random();
+        var ao = new WornItem(UUID.Random(), "Walk AO", AttachmentPoint.Pelvis);
+        var anims = new List<Animation>
+        {
+            new() { AnimationID = Animations.STAND, AnimationSequence = 1, AnimationSourceObjectID = jim },
+            new() { AnimationID = Animations.TYPE, AnimationSequence = 2, AnimationSourceObjectID = jim },
+            new() { AnimationID = UUID.Random(), AnimationSequence = 3, AnimationSourceObjectID = ball },
+            new() { AnimationID = UUID.Random(), AnimationSequence = 4, AnimationSourceObjectID = ball },
+            new() { AnimationID = UUID.Random(), AnimationSequence = 5, AnimationSourceObjectID = ao.Id },
+            new() { AnimationID = UUID.Random(), AnimationSequence = 6, AnimationSourceObjectID = jim },
+        };
+
+        var doing = AvatarActivity.Describe(anims, jim, [ao], id => id == ball ? "Dance Ball" : null);
+
+        Assert.Equal(
+        [
+            "standing", "typing",
+            "2 custom animations from \"Dance Ball\"",
+            "a custom animation from their attachment \"Walk AO\" (pelvis)",
+            "a custom animation (from their animation override or a gesture)",
+        ], doing);
+    }
+
+    [Fact]
+    public void Avatars_carry_what_they_wear_hold_and_do()
+    {
+        var self = UUID.Random();
+        var jim = new Avatar { ID = UUID.Random(), LocalID = 50, Position = Me + new Vector3(0, 5, 0) };
+        jim.Animations = [new Animation { AnimationID = Animations.STAND, AnimationSourceObjectID = jim.ID }];
+        var mug = Attachment(51, 50, AttachmentPoint.RightHand);
+        var hair = Attachment(52, 50, AttachmentPoint.Skull);
+        var hud = Attachment(53, 50, AttachmentPoint.HUDTop);
+        var names = new Dictionary<UUID, string> { [mug.ID] = "Coffee Mug", [hair.ID] = "Ponytail" };
+
+        var a = Assert.Single(SceneBuilder.Avatars([jim], null, self, _ => null, null, [mug, hair, hud], id => names.GetValueOrDefault(id)));
+
+        Assert.Equal(["standing"], a.Activity);
+        Assert.Equal([mug.ID, hair.ID], a.Worn.Select(w => w.Id));
+        Assert.True(a.Worn[0].Held);
+        Assert.Equal("\"Coffee Mug\" (right hand)", a.Worn[0].ToString());
+    }
+
+    [Fact]
+    public void Owner_line_says_what_they_do_and_hold()
+    {
+        var jim = new SeenAvatar
+        {
+            Id = UUID.Random(), Name = "Jimmi Tiponi", Position = Me + new Vector3(0, 8, 0),
+            Activity = ["standing", "typing"],
+            Worn = [new WornItem(UUID.Random(), "Coffee Mug", AttachmentPoint.RightHand), new WornItem(UUID.Random(), "Hair", AttachmentPoint.Skull)],
+        };
+        var scene = new Scene { Region = "R", SelfPosition = Me, OwnerName = "Jimmi Tiponi", Owner = jim, Avatars = [jim], Radius = 30 };
+        Assert.Contains("Jimmi Tiponi is 8 m north, standing, typing. Holding \"Coffee Mug\" (right hand).", SceneFormatter.Describe(scene, 25));
+    }
+
+    [Fact]
+    public void Inspecting_an_avatar_lists_activity_held_items_and_attachments()
+    {
+        var jim = new SeenAvatar
+        {
+            Id = UUID.Random(), Name = "Jimmi Tiponi", Position = Me + new Vector3(3, 0, 0), Sitting = true,
+            Activity = ["sitting", "a custom animation from \"Couch\""],
+            Worn = [new WornItem(UUID.Random(), "Book", AttachmentPoint.LeftHand), new WornItem(UUID.Random(), null, AttachmentPoint.Chest)],
+        };
+        var text = ObjectDetailsFormatter.DescribeAvatar(jim, Me, isOwner: true, sittingOn: "\"Couch\"");
+        Assert.Contains("Where: 3 m east, sitting on \"Couch\".", text);
+        Assert.Contains("Doing: a custom animation from \"Couch\".", text);
+        Assert.Contains("Holding: \"Book\" (left hand).", text);
+        Assert.Contains("Wearing (1 attachment):\n- an unnamed item (chest)", text.Replace("\r", ""));
+        Assert.Contains(ObjectDetailsFormatter.ClothingNote, text);
+    }
+
+    [Fact]
+    public void Far_avatars_say_their_outfit_cant_be_seen()
+    {
+        var far = new SeenAvatar { Id = UUID.Random(), Name = "Some One", Position = new Vector3(10, 10, 0), Approximate = true };
+        Assert.Contains("beyond the bot's draw distance", ObjectDetailsFormatter.DescribeAvatar(far, Me, false, null));
+    }
+}
