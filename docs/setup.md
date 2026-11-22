@@ -118,6 +118,12 @@ Claude then loops: it calls `wait_for_message`, reads what you said, answers wit
 
 Sandboxes are a good place to experiment. Some regions block bots, and the bot will be refused there.
 
+### Asking what the bot sees
+
+Ask Claude "What's around DexterFrost?" or "Where am I compared to the bot?". Claude calls `describe_surroundings`, which reports the region and parcel, where you are (for example "8 m northeast, 3 m above"), other avatars, and nearby objects. For a closer look at one thing, ask "What is that chair?" and Claude calls `inspect_object` with its id.
+
+Object names come from the region a moment after the bot asks for them, so the first description in a new place can list a few objects as unnamed. Asking again fills them in.
+
 When you're done, ask Claude to log the bot out.
 
 ## Activity log
