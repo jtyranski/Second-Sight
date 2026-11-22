@@ -7,8 +7,8 @@ public class AvatarNameTests
     [Theory]
     [InlineData("Jimmi Tiponi", "Jimmi", "Tiponi")]
     [InlineData("jimmi.tiponi", "jimmi", "tiponi")]
-    [InlineData("  SamSecondsight  ", "SamSecondsight", "Resident")]
-    [InlineData("SamSecondsight Resident", "SamSecondsight", "Resident")]
+    [InlineData("  DexterFrost  ", "DexterFrost", "Resident")]
+    [InlineData("DexterFrost Resident", "DexterFrost", "Resident")]
     public void Parse_splits_first_and_last(string input, string first, string last)
     {
         var name = AvatarName.Parse(input);
@@ -26,7 +26,7 @@ public class AvatarNameTests
     [Fact]
     public void DisplayName_hides_Resident()
     {
-        Assert.Equal("SamSecondsight", AvatarName.Parse("SamSecondsight").DisplayName);
+        Assert.Equal("DexterFrost", AvatarName.Parse("DexterFrost").DisplayName);
         Assert.Equal("Jimmi Tiponi", AvatarName.Parse("Jimmi Tiponi").DisplayName);
     }
 
@@ -34,8 +34,8 @@ public class AvatarNameTests
     [InlineData("Jimmi Tiponi", "jimmi tiponi", true)]
     [InlineData("Jimmi Tiponi", "jimmi.tiponi", true)]
     [InlineData("Jimmi Tiponi", "Jimmi Tiponix", false)]
-    [InlineData("SamSecondsight", "SamSecondsight Resident", true)]
-    [InlineData("SamSecondsight", "", false)]
+    [InlineData("DexterFrost", "DexterFrost Resident", true)]
+    [InlineData("DexterFrost", "", false)]
     [InlineData("Jimmi Tiponi", "a b c", false)]
     public void Matches_ignores_case_and_Resident(string name, string other, bool expected) =>
         Assert.Equal(expected, AvatarName.Parse(name).Matches(other));
