@@ -23,7 +23,15 @@ cd Second-Sight
 dotnet publish src/SecondSight -c Release -o C:\SecondSight
 ```
 
-This puts `SecondSight.exe` in `C:\SecondSight`. Run the same `dotnet publish` command again after you pull updates.
+This puts `SecondSight.exe` in `C:\SecondSight`.
+
+To update later, quit Claude Desktop (from the system tray icon), then run this in the `Second-Sight` folder and reopen Claude Desktop:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\update.ps1
+```
+
+It pulls the latest `main` and rebuilds `C:\SecondSight`.
 
 ## 4. Configure the bot
 
