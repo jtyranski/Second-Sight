@@ -110,7 +110,20 @@ To chat, stand near the bot in Second Life and ask Claude something like:
 
 > Chat with me in Second Life. Keep waiting for my messages and reply in local chat until I say goodbye.
 
-Claude then loops: it calls `wait_for_message`, reads what you said, answers with `say`, and waits again. You can also IM the bot. Claude Desktop asks before each tool call, so choose **Always allow** for the Second Sight tools to keep the conversation flowing.
+Claude then loops: it reads what you said, answers with `reply_and_wait` (which sends the answer and waits for your next message in one step), and repeats. You can also IM the bot.
+
+### Making chat feel quick
+
+Each reply Dexter gives is one Claude turn, so a few habits keep the gap short:
+
+- **Allow all Second Sight tools.** In Claude Code, add `mcp__second-sight` to `permissions.allow` in `~/.claude/settings.json` (or `/permissions` > Allow > add `mcp__second-sight`, saved to user settings). In Claude Desktop, choose **Always allow** the first time each tool is used. Without this, every reply waits for you to approve it. Allowing everything also lets Claude remove friends or set home without asking; leave `remove_friend` out of the rule if you'd rather approve that one.
+- **Start a fresh session for each chat.** A long session carries everything before it, and each turn gets slower as it grows.
+- **Ask for `reply_and_wait`.** It sends Claude's reply and waits for your next message in one step, instead of `say` then `wait_for_message`. A good opening prompt:
+
+  > Log in Dexter if needed, then chat with me in Second Life. Use reply_and_wait for every answer, keep replies short, and stop when I say goodbye.
+
+While Claude is working out an answer, Dexter turns to face you and plays the typing animation, so you can see he heard you. The typing stops when he speaks, or after 45 seconds.
+
 
 ### Bringing the bot somewhere
 

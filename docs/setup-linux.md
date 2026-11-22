@@ -55,7 +55,19 @@ Install [Claude Code](https://docs.claude.com/en/docs/claude-code/setup), then r
 claude mcp add --scope user second-sight -- ~/.local/share/SecondSight/app/SecondSight
 ```
 
-Start `claude` in any folder and type `/mcp`. `second-sight` should show as connected. When Claude first uses a Second Sight tool, choose the option that stops it asking again for that tool, so chat isn't interrupted.
+Start `claude` in any folder and type `/mcp`. `second-sight` should show as connected.
+
+To stop Claude Code asking before every Second Sight tool call, which slows chat down a lot, add this to `~/.claude/settings.json` (merge it with anything already there), then restart Claude Code:
+
+```json
+{
+  "permissions": {
+    "allow": ["mcp__second-sight"]
+  }
+}
+```
+
+That allows every Second Sight tool, including `remove_friend` and `set_home`. To keep approving those two yourself, list the tools one by one instead, for example `"mcp__second-sight__reply_and_wait"`.
 
 ### Claude Desktop
 
@@ -82,7 +94,7 @@ Ask Claude: "Log the Second Sight bot in and tell me where it is." Claude calls 
 Do these in order with your own avatar logged in nearby. Each line says what to ask Claude and what you should see.
 
 1. **Diagnostics:** "Run the Second Sight diagnostics." The version should match the latest merge, and the config file should be `~/.config/SecondSight/config.json` (not "not found").
-2. **Chat:** "Chat with me in Second Life until I say goodbye." Say something in local chat. Claude should answer in local chat. Have a friend (or an object) say something nearby: Claude should see it as background and not answer.
+2. **Chat:** in a fresh Claude Code session, say "Chat with me in Second Life. Use reply_and_wait for every answer, keep replies short, and stop when I say goodbye." Say something in local chat. Dexter should turn toward you and start typing, then answer in local chat. Have a friend (or an object) say something nearby: Claude should see it as background and not answer.
 3. **IM:** IM DexterFrost. Claude should get it and can answer with an IM.
 4. **Teleport to you:** offer DexterFrost a teleport. He should arrive, and Claude should report where.
 5. **Teleport to the bot:** ask Claude to "send me a teleport offer". Accept it in your viewer.

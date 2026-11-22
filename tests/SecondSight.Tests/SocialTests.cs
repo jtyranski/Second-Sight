@@ -39,6 +39,14 @@ public class FriendRequestTests
     }
 
     [Fact]
+    public void Book_remembers_whether_a_request_arrived_offline()
+    {
+        var book = new FriendRequestBook();
+        book.Add(new FriendRequest(UUID.Random(), "Alt Person", UUID.Random(), Now, Offline: true));
+        Assert.True(book.Take("Alt Person").Found!.Offline);
+    }
+
+    [Fact]
     public void Book_keeps_at_most_fifty()
     {
         var book = new FriendRequestBook();

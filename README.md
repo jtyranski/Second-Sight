@@ -18,6 +18,7 @@ The bot can log in, chat with its owner, teleport, describe what is around it, s
 | `send_im` | Sends an IM to the owner. The bot can't IM anyone else. |
 | `get_messages` | Returns new chat and IMs without waiting. |
 | `wait_for_message` | Waits until the owner says something, then returns it. Claude uses this in a loop to hold a conversation. |
+| `reply_and_wait` | Sends a reply (local chat or IM) and waits for the owner's next message in one step. The fastest way to hold a conversation. |
 | `teleport` | Teleports to a region and position, or to a SLURL. |
 | `teleport_home` | Teleports to the bot's home location. |
 | `offer_teleport` | Sends the owner a teleport offer to the bot's location. |
@@ -41,6 +42,11 @@ The bot can log in, chat with its owner, teleport, describe what is around it, s
 - When the owner sends the bot a teleport offer, the bot accepts it automatically and tells Claude where it arrived. Teleport offers from anyone else are declined.
 - When the owner uses "Request teleport" on the bot, it sends the owner a teleport offer back.
 - Regions that block scripted agents refuse the bot. The `teleport` tool reports this.
+
+### Chatting
+
+- When the owner speaks in local chat, the bot turns toward them and plays the typing animation until Claude's reply goes out (or 45 seconds pass).
+- See [Making chat feel quick](docs/setup.md#making-chat-feel-quick) for settings that cut the delay between replies.
 
 ### Who the bot listens to
 

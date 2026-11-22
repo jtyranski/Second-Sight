@@ -2,8 +2,11 @@ using LibreMetaverse;
 
 namespace SecondSight.Core.Social;
 
-/// <summary>A friendship offer waiting for the owner to decide.</summary>
-public sealed record FriendRequest(UUID AgentId, string Name, UUID SessionId, DateTimeOffset Received);
+/// <summary>
+/// A friendship offer waiting for the owner to decide. <paramref name="Offline"/> is true when it was stored
+/// while the bot was logged out and delivered at login; those are answered differently.
+/// </summary>
+public sealed record FriendRequest(UUID AgentId, string Name, UUID SessionId, DateTimeOffset Received, bool Offline = false);
 
 /// <summary>What the bot does with an incoming friendship offer.</summary>
 public enum FriendRequestAction

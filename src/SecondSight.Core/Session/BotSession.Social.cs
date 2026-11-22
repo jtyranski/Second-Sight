@@ -18,14 +18,12 @@ public sealed partial class BotSession : ISocial
     private void AttachSocial(GridClient client)
     {
         _friendRequests.Clear();
-        client.Friends.FriendshipOffered += OnFriendshipOffered;
         client.Friends.FriendshipResponse += OnFriendshipResponse;
         client.Friends.FriendshipTerminated += OnFriendshipTerminated;
     }
 
     private void DetachSocial(GridClient client)
     {
-        client.Friends.FriendshipOffered -= OnFriendshipOffered;
         client.Friends.FriendshipResponse -= OnFriendshipResponse;
         client.Friends.FriendshipTerminated -= OnFriendshipTerminated;
     }
@@ -34,22 +32,24 @@ public sealed partial class BotSession : ISocial
     public static FriendRequestAction DecideFriendRequest(UUID from, string? name, Chat.OwnerIdentity owner) =>
         owner.IsOwner(from, name, isAvatar: true) ? FriendRequestAction.Accept : FriendRequestAction.AskOwner;
 
-    private void OnFriendshipOffered(object? sender, FriendshipOfferedEventArgs e)
+    /// <summary>
+    /// Handles a friendship offer IM. <paramref name="offline"/> is true when the offer was stored while the bot
+    /// was logged out (it arrives without a simulator); Second Life wants those answered through a capability.
+    /// </summary>
+    private void HandleFriendOffer(GridClient client, InstantMessage im, bool offline)
     {
-        var client = _client;
-        if (client == null) return;
-        var name = FriendsFormatter.DisplayName(e.AgentName);
-        _recent.Add($"Friendship offer from {e.AgentName} ({e.AgentID})");
+        var name = FriendsFormatter.DisplayName(im.FromAgentName);
+        _recent.Add($"Friendship offer from {im.FromAgentName} ({im.FromAgentID}){(offline ? " [offline]" : "")}");
 
-        if (DecideFriendRequest(e.AgentID, e.AgentName, _owner) == FriendRequestAction.Accept)
+        if (DecideFriendRequest(im.FromAgentID, im.FromAgentName, _owner) == FriendRequestAction.Accept)
         {
             _activity.Write("friend-accept", $"Accepted friendship offer from {name}");
             AddEvent($"{name} sent a friend request. Accepted it.");
-            _ = RespondAsync(client, e.AgentID, e.SessionID, accept: true);
+            _ = RespondAsync(client, im.FromAgentID, im.IMSessionID, offline, accept: true);
             return;
         }
 
-        var isNew = _friendRequests.Add(new FriendRequest(e.AgentID, e.AgentName, e.SessionID, _time.GetLocalNow()));
+        var isNew = _friendRequests.Add(new FriendRequest(im.FromAgentID, im.FromAgentName, im.IMSessionID, _time.GetLocalNow(), offline));
         _activity.Write("friend-request", $"Friend request from {name}; waiting for {OwnerName}");
         AddEvent($"Friend request from {name}. Don't accept or decline it yourself: ask {OwnerName}, " +
                  "then use respond_friend_request with their answer.");
@@ -84,20 +84,31 @@ public sealed partial class BotSession : ISocial
         _activity.Write("im-to-owner", text);
     }
 
-    private async Task RespondAsync(GridClient client, UUID agent, UUID session, bool accept)
+    /// <summary>
+    /// Answers a friendship offer. A live offer is answered with the offer's IM session, like a normal viewer does.
+    /// An offer delivered at login is answered through the AcceptFriendship/DeclineFriendship capability when the
+    /// region has it. (LibreMetaverse's capability calls only log failures, so the live path must not depend on them.)
+    /// </summary>
+    private async Task RespondAsync(GridClient client, UUID agent, UUID session, bool offline, bool accept)
     {
+        var capName = accept ? "AcceptFriendship" : "DeclineFriendship";
+        var useCap = offline && client.Network.CurrentSim?.Caps?.CapabilityURI(capName) != null;
+        _recent.Add($"  -> {(accept ? "accept" : "decline")} friendship from {agent} via {(useCap ? capName + " capability" : "session " + session)}");
         try
         {
-            using var timeout = new CancellationTokenSource(FriendshipReplyTimeout);
-            if (accept) await client.Friends.AcceptFriendshipViaCapAsync(agent, timeout.Token);
-            else await client.Friends.DeclineFriendshipViaCapAsync(agent, timeout.Token);
+            if (useCap)
+            {
+                using var timeout = new CancellationTokenSource(FriendshipReplyTimeout);
+                if (accept) await client.Friends.AcceptFriendshipViaCapAsync(agent, timeout.Token);
+                else await client.Friends.DeclineFriendshipViaCapAsync(agent, timeout.Token);
+            }
+            else if (accept) client.Friends.AcceptFriendship(agent, session);
+            else client.Friends.DeclineFriendship(agent, session);
         }
         catch (Exception e)
         {
-            // Older regions only take the message form.
-            _logger.LogInformation(e, "Friendship capability failed; answering the old way");
-            if (accept) client.Friends.AcceptFriendship(agent, session);
-            else client.Friends.DeclineFriendship(agent, session);
+            _logger.LogWarning(e, "Answering the friendship offer from {Agent} failed", agent);
+            _recent.Add($"  -> failed: {e.Message}");
         }
     }
 
@@ -158,7 +169,7 @@ public sealed partial class BotSession : ISocial
             return new(false, $"No friend request from \"{who}\" is waiting. {FriendsFormatter.Pending(_friendRequests.Pending).TrimEnd()}");
         }
 
-        await RespondAsync(client, request.AgentId, request.SessionId, accept);
+        await RespondAsync(client, request.AgentId, request.SessionId, request.Offline, accept);
         var name = FriendsFormatter.DisplayName(request.Name);
         _activity.Write(accept ? "friend-accept" : "friend-decline", $"{(accept ? "Accepted" : "Declined")} friend request from {name}");
         return new(true, $"{(accept ? "Accepted" : "Declined")} the friend request from {name}.");

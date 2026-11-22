@@ -73,4 +73,47 @@ public class ChatToolsTests
     {
         Assert.Equal("No new messages from Jimmi Tiponi.", new ChatTools(new FakeChat(), new MessageInbox()).GetMessages());
     }
+
+    private static ChatMessage FromJim(string text) => new()
+    {
+        Time = DateTimeOffset.Now, Channel = MessageChannel.LocalChat, FromName = "Jimmi Tiponi", FromId = "x",
+        Speaker = SpeakerKind.Avatar, Text = text, FromOwner = true,
+    };
+
+    [Fact]
+    public async Task ReplyAndWait_says_then_returns_the_next_message()
+    {
+        var chat = new FakeChat();
+        var inbox = new MessageInbox();
+        var wait = new ChatTools(chat, inbox).ReplyAndWait("hello Jim", timeoutSeconds: 30);
+        Assert.Equal(("hello Jim", ChatVolume.Normal), chat.Said.Single());
+        inbox.Add(FromJim("how are you"));
+        var text = await wait.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.StartsWith("Sent. ", text);
+        Assert.Contains("how are you", text);
+    }
+
+    [Fact]
+    public async Task ReplyAndWait_can_answer_by_im_and_whisper()
+    {
+        var chat = new FakeChat();
+        var inbox = new MessageInbox();
+        inbox.Add(FromJim("next"));
+        await new ChatTools(chat, inbox).ReplyAndWait("private", via: "IM", timeoutSeconds: 1);
+        Assert.Equal("private", chat.Ims.Single());
+        inbox.Add(FromJim("next"));
+        await new ChatTools(chat, inbox).ReplyAndWait("quiet", volume: "whisper", timeoutSeconds: 1);
+        Assert.Equal(("quiet", ChatVolume.Whisper), chat.Said.Single());
+    }
+
+    [Fact]
+    public async Task ReplyAndWait_does_not_wait_when_nothing_was_sent()
+    {
+        var chat = new FakeChat();
+        var tools = new ChatTools(chat, new MessageInbox());
+        Assert.StartsWith("Not sent: unknown channel", await tools.ReplyAndWait("x", via: "group", timeoutSeconds: 300));
+        Assert.StartsWith("Not sent: unknown volume", await tools.ReplyAndWait("x", volume: "scream", timeoutSeconds: 300));
+        Assert.Empty(chat.Said);
+        Assert.Empty(chat.Ims);
+    }
 }

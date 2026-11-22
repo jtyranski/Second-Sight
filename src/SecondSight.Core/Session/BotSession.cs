@@ -250,6 +250,7 @@ public sealed partial class BotSession : IBotSession, IChatChannel, ITravel, IPe
             return Task.FromResult(new SessionResult(false, reason!));
         }
 
+        StopTyping(client);
         foreach (var chunk in chunks)
         {
             send(client, chunk);
@@ -267,7 +268,11 @@ public sealed partial class BotSession : IBotSession, IChatChannel, ITravel, IPe
             e.Position, e.Message, client.Self.AgentID, client.Self.SimPosition, _owner, _time.GetLocalNow());
         if (message == null) return;
         _inbox.Add(message);
-        if (message.FromOwner) _activity.Write("heard-owner", message.Text);
+        if (message.FromOwner)
+        {
+            _activity.Write("heard-owner", message.Text);
+            ReactToOwner(client, e.Position);
+        }
     }
 
     private void OnInstantMessage(object? sender, InstantMessageEventArgs e)
@@ -275,6 +280,11 @@ public sealed partial class BotSession : IBotSession, IChatChannel, ITravel, IPe
         var client = _client;
         if (client == null) return;
         _recent.Add($"IM {e.IM.Dialog} from {e.IM.FromAgentName} ({e.IM.FromAgentID}){(e.IM.FromAgentID == _owner.Id ? " [owner]" : "")}");
+        if (e.IM.Dialog == InstantMessageDialog.FriendshipOffered && e.IM.FromAgentID != client.Self.AgentID)
+        {
+            HandleFriendOffer(client, e.IM, offline: e.Simulator == null);
+            return;
+        }
         if (HandleLure(client, e.IM)) return;
         var message = MessageClassifier.FromInstantMessage(e.IM, client.Self.AgentID, _owner, _time.GetLocalNow());
         if (message == null)
