@@ -13,13 +13,13 @@ public class ConfigTests
         var config = ConfigLoader.Parse("""
             {
               // the bot account
-              "username": "SamSecondsight",
+              "username": "DexterFrost",
               "Owner": "Jimmi Tiponi",
               "StartLocation": "home",
               "AutoLogin": true,
             }
             """);
-        Assert.Equal("SamSecondsight", config.Username);
+        Assert.Equal("DexterFrost", config.Username);
         Assert.Equal("Jimmi Tiponi", config.Owner);
         Assert.Equal("home", config.StartLocation);
         Assert.True(config.AutoLogin);
@@ -43,9 +43,9 @@ public class ConfigTests
         var path = Path.GetTempFileName();
         try
         {
-            File.WriteAllText(path, """{ "Username": "SamSecondsight" }""");
+            File.WriteAllText(path, """{ "Username": "DexterFrost" }""");
             var config = ConfigLoader.Load(Env(new() { [ConfigLoader.ConfigPathVariable] = path }));
-            Assert.Equal("SamSecondsight", config.Username);
+            Assert.Equal("DexterFrost", config.Username);
         }
         finally { File.Delete(path); }
     }
@@ -68,7 +68,7 @@ public class ConfigTests
     [Fact]
     public void Validate_passes_complete_config_and_never_echoes_password()
     {
-        var config = new BotConfig { Username = "SamSecondsight", Password = "hunter2", Owner = "Jimmi Tiponi" };
+        var config = new BotConfig { Username = "DexterFrost", Password = "hunter2", Owner = "Jimmi Tiponi" };
         Assert.Empty(config.Validate());
 
         config.StartLocation = "/bad";

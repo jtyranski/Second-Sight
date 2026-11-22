@@ -2,7 +2,7 @@
 
 ## 1. Prepare the bot account
 
-1. Sign in to [secondlife.com](https://secondlife.com) as the bot account (SamSecondsight).
+1. Sign in to [secondlife.com](https://secondlife.com) as the bot account (DexterFrost).
 2. Open **Account > Scripted Agent Status** and mark the account as a scripted agent. Linden Lab's policy requires this.
 3. Make sure multi-factor authentication is **off** for the bot account. The bot can't answer an MFA prompt.
 4. Log in once with a normal viewer to accept the Terms of Service, and park the bot somewhere sensible. With the default `"StartLocation": "last"`, the bot logs back in there.
@@ -73,6 +73,6 @@ Ask Claude: "Log the Second Sight bot in and tell me where it is." Claude calls 
 
 ## Troubleshooting
 
-- **Login failed: ... password ...** The username or password is wrong. The username is the account name (`SamSecondsight`), not a display name.
+- **Login failed: ... password ...** The username or password is wrong. The username is the account name (`DexterFrost`), not a display name.
 - **Could not find the owner avatar** The bot logged in, but the name search for the owner came back empty. Check the spelling of `Owner`, or set it to your avatar's UUID.
 - **Logs** The server writes its logs to stderr. Claude Desktop saves them in `%APPDATA%\Claude\logs\mcp-server-second-sight.log`.
