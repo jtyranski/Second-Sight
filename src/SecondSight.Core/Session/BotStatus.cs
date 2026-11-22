@@ -17,6 +17,8 @@ public sealed record BotStatus
     public string? OwnerName { get; init; }
     public string? OwnerId { get; init; }
     public string? LastError { get; init; }
+    public int? MessagesSentToday { get; init; }
+    public int? DailyMessageLimit { get; init; }
 
     /// <summary>Plain-text summary for Claude.</summary>
     public string Describe()
@@ -49,6 +51,9 @@ public sealed record BotStatus
             sb.Append(CultureInfo.InvariantCulture, $" Owner: {OwnerName}");
             sb.Append(OwnerId != null ? $" ({OwnerId})." : " (UUID not resolved yet).");
         }
+
+        if (State == ConnectionState.LoggedIn && MessagesSentToday is { } sent && DailyMessageLimit is { } limit)
+            sb.Append(CultureInfo.InvariantCulture, $" Messages sent today: {sent} of {limit}.");
 
         if (LastError != null) sb.Append(CultureInfo.InvariantCulture, $" Last problem: {LastError}");
         return sb.ToString();

@@ -77,3 +77,21 @@ public class ConfigTests
         Assert.DoesNotContain(problems, p => p.Contains("hunter2"));
     }
 }
+
+public class ExampleConfigTests
+{
+    [Fact]
+    public void Example_config_parses_and_only_lacks_a_password()
+    {
+        var dir = AppContext.BaseDirectory;
+        while (dir != null && !File.Exists(Path.Combine(dir, "config.example.json"))) dir = Path.GetDirectoryName(dir);
+        Assert.NotNull(dir);
+
+        var config = ConfigLoader.Parse(File.ReadAllText(Path.Combine(dir!, "config.example.json")));
+        Assert.Equal("DexterFrost", config.Username);
+        Assert.Equal(500, config.DailyMessageLimit);
+        Assert.Equal(10, config.MessagesPerMinute);
+        var problem = Assert.Single(config.Validate());
+        Assert.Contains("Password", problem);
+    }
+}
