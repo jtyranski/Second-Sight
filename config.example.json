@@ -3,7 +3,7 @@
   // Never commit your real config: it holds the bot's password.
 
   // The bot account's username.
-  "Username": "SamSecondsight",
+  "Username": "DexterFrost",
 
   // The bot's password. You can leave this out and set the
   // SECONDSIGHT_PASSWORD environment variable instead.

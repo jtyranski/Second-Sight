@@ -2,7 +2,7 @@
 
 ## 1. Prepare the bot account
 
-1. Sign in to [secondlife.com](https://secondlife.com) as the bot account (SamSecondsight).
+1. Sign in to [secondlife.com](https://secondlife.com) as the bot account (DexterFrost).
 2. Open **Account > Scripted Agent Status** and mark the account as a scripted agent. Linden Lab's policy requires this.
 3. Make sure multi-factor authentication is **off** for the bot account. The bot can't answer an MFA prompt.
 4. Log in once with a normal viewer to accept the Terms of Service, and park the bot somewhere sensible. With the default `"StartLocation": "last"`, the bot logs back in there.
@@ -49,7 +49,18 @@ Each setting can also be set with an environment variable: `SECONDSIGHT_USERNAME
 
 ### Claude Desktop
 
-Open **Settings > Developer > Edit Config**. Then add this to `claude_desktop_config.json` and restart Claude Desktop:
+Claude Desktop reads its MCP servers from `claude_desktop_config.json`. Where that file lives depends on how Claude Desktop was installed:
+
+- Installer from claude.ai: `%APPDATA%\Claude\claude_desktop_config.json`
+- Microsoft Store / MSIX install: a folder like `%LOCALAPPDATA%\Claude-Data\claude_<id>\claude_desktop_config.json`
+
+If you're not sure, this finds it:
+
+```powershell
+Get-ChildItem $env:APPDATA, $env:LOCALAPPDATA -Recurse -Depth 6 -Filter claude_desktop_config.json -ErrorAction SilentlyContinue | Select-Object FullName
+```
+
+Add a `second-sight` entry under `mcpServers`, then fully quit Claude Desktop from the system tray and reopen it:
 
 ```json
 {
@@ -59,6 +70,18 @@ Open **Settings > Developer > Edit Config**. Then add this to `claude_desktop_co
     }
   }
 }
+```
+
+To add the entry without hand-editing, set `$p` to the path you found and run this. It backs the file up first and keeps everything else in it:
+
+```powershell
+$p = "<path to claude_desktop_config.json>"
+Copy-Item $p "$p.bak"
+$c = Get-Content $p -Raw | ConvertFrom-Json
+if ($null -eq $c) { $c = [pscustomobject]@{} }
+if (-not $c.PSObject.Properties['mcpServers']) { $c | Add-Member -NotePropertyName mcpServers -NotePropertyValue ([pscustomobject]@{}) }
+$c.mcpServers | Add-Member -Force -NotePropertyName 'second-sight' -NotePropertyValue ([pscustomobject]@{ command = 'C:\SecondSight\SecondSight.exe' })
+[IO.File]::WriteAllText($p, ($c | ConvertTo-Json -Depth 20))
 ```
 
 ### Claude Code
@@ -73,6 +96,6 @@ Ask Claude: "Log the Second Sight bot in and tell me where it is." Claude calls 
 
 ## Troubleshooting
 
-- **Login failed: ... password ...** The username or password is wrong. The username is the account name (`SamSecondsight`), not a display name.
+- **Login failed: ... password ...** The username or password is wrong. The username is the account name (`DexterFrost`), not a display name.
 - **Could not find the owner avatar** The bot logged in, but the name search for the owner came back empty. Check the spelling of `Owner`, or set it to your avatar's UUID.
-- **Logs** The server writes its logs to stderr. Claude Desktop saves them in `%APPDATA%\Claude\logs\mcp-server-second-sight.log`.
+- **Logs** The server writes its logs to stderr. Claude Desktop saves them in a `logs` folder next to `claude_desktop_config.json`, in `mcp-server-second-sight.log`.

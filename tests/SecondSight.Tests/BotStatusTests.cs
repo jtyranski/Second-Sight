@@ -17,7 +17,7 @@ public class BotStatusTests
         var status = new BotStatus
         {
             State = ConnectionState.LoggedIn,
-            AvatarName = "SamSecondsight Resident",
+            AvatarName = "DexterFrost Resident",
             Region = "Ahern",
             Position = (128.4f, 64.6f, 22.1f),
             Flying = true,
@@ -25,7 +25,7 @@ public class BotStatusTests
             OwnerId = "11111111-2222-3333-4444-555555555555",
         };
         Assert.Equal(
-            "Logged in as SamSecondsight Resident in region Ahern at (128, 65, 22). Flying. " +
+            "Logged in as DexterFrost Resident in region Ahern at (128, 65, 22). Flying. " +
             "Owner: Jimmi Tiponi (11111111-2222-3333-4444-555555555555).",
             status.Describe());
     }

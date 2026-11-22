@@ -3,7 +3,7 @@ namespace SecondSight.Core.Config;
 /// <summary>Settings for the bot. Loaded from a JSON file outside the repo, with environment variable overrides.</summary>
 public sealed class BotConfig
 {
-    /// <summary>The bot account's username, e.g. "SamSecondsight".</summary>
+    /// <summary>The bot account's username, e.g. "DexterFrost".</summary>
     public string? Username { get; set; }
 
     /// <summary>The bot account's password. Prefer the SECONDSIGHT_PASSWORD environment variable.</summary>

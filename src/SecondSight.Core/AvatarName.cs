@@ -23,7 +23,7 @@ public sealed record AvatarName(string First, string Last)
         };
     }
 
-    /// <summary>Full name as Second Life shows it, e.g. "Jimmi Tiponi" or "SamSecondsight Resident".</summary>
+    /// <summary>Full name as Second Life shows it, e.g. "Jimmi Tiponi" or "DexterFrost Resident".</summary>
     public string FullName => $"{First} {Last}";
 
     /// <summary>Name as people usually write it: the "Resident" last name is dropped.</summary>
