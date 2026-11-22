@@ -25,7 +25,7 @@ public static class SceneFormatter
         sb.AppendLine(".");
 
         sb.AppendLine(scene.Owner is { } owner
-            ? $"{scene.OwnerName} is {Where(me, owner)}{(owner.Sitting ? ", sitting" : "")}."
+            ? $"{scene.OwnerName} is {Where(me, owner)}{Doing(owner)}.{Holding(owner)}"
             : $"{scene.OwnerName} is not in this region.");
 
         var others = scene.Avatars.Where(a => scene.Owner == null || a.Id != scene.Owner.Id)
@@ -36,7 +36,7 @@ public static class SceneFormatter
         {
             sb.AppendLine($"Other avatars in the region ({others.Count}):");
             foreach (var a in others.Take(20))
-                sb.AppendLine($"- {a.Name ?? "(name not loaded yet)"}: {Where(me, a)}{(a.Sitting ? ", sitting" : "")}");
+                sb.AppendLine($"- {a.Name ?? "(name not loaded yet)"}: {Where(me, a)}{Doing(a)}{(a.Worn.Any(w => w.Held) ? "; holding " + string.Join(", ", a.Worn.Where(w => w.Held)) : "")}");
             if (others.Count > 20) sb.AppendLine($"- ...and {others.Count - 20} more.");
         }
 
@@ -53,6 +53,20 @@ public static class SceneFormatter
             sb.AppendLine(UntrustedNote);
         }
         return sb.ToString().TrimEnd();
+    }
+
+    /// <summary>", sitting, typing" style activity; ", sitting" when the animations aren't known.</summary>
+    public static string Doing(SeenAvatar a)
+    {
+        var activity = a.Activity.ToList();
+        if (a.Sitting && !activity.Any(x => x.StartsWith("sitting", StringComparison.Ordinal))) activity.Insert(0, "sitting");
+        return activity.Count == 0 ? "" : ", " + string.Join(", ", activity);
+    }
+
+    public static string Holding(SeenAvatar a)
+    {
+        var held = a.Worn.Where(w => w.Held).ToList();
+        return held.Count == 0 ? "" : $" Holding {string.Join(" and ", held)}.";
     }
 
     public static string Where(Vector3 me, SeenAvatar a) =>

@@ -12,6 +12,12 @@ public sealed record SeenAvatar
 
     /// <summary>True when only the minimap ("coarse") position is known: the avatar is farther than draw distance.</summary>
     public bool Approximate { get; init; }
+
+    /// <summary>What the avatar is doing, from its animations ("standing", "typing", "a custom animation from ...").</summary>
+    public IReadOnlyList<string> Activity { get; init; } = [];
+
+    /// <summary>Attached objects: worn clothing, hair, and anything held.</summary>
+    public IReadOnlyList<WornItem> Worn { get; init; } = [];
 }
 
 public enum SceneObjectKind { Object, Tree }

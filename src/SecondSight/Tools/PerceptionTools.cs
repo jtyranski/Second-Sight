@@ -15,7 +15,7 @@ public sealed class PerceptionTools(IPerception perception)
 
     [McpServerTool(Name = "describe_surroundings", ReadOnly = true), Description(
         "Describe what is around the bot: the region and parcel, where your owner is (distance and compass " +
-        "direction), other avatars in the region, and nearby objects, nearest first, with their size, whether " +
+        "direction) and what they are doing and holding, other avatars in the region, and nearby objects, nearest first, with their size, whether " +
         "they can be sat on or touched, and an id for inspect_object. Directions are compass points: north is +Y, east is +X.")]
     public async Task<string> DescribeSurroundings(
         [Description("How far to look for objects, in meters (1-128). Default 30.")] float radius = DefaultRadius,
@@ -28,7 +28,8 @@ public sealed class PerceptionTools(IPerception perception)
 
     [McpServerTool(Name = "inspect_object", ReadOnly = true), Description(
         "Look closely at one object or avatar near the bot, by the id from describe_surroundings: its name, " +
-        "description, floating text, owner, creator, size, where it is, whether it is for sale, and what clicking it does.")]
+        "description, floating text, owner, creator, size, where it is, whether it is for sale, and what clicking it does. " +
+        "For an avatar (including your owner): where they are, what they are doing (animations), what they hold, and the attachments they wear.")]
     public async Task<string> InspectObject(
         [Description("The object's or avatar's id (UUID) from describe_surroundings.")] string id,
         CancellationToken cancellationToken = default)

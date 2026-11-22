@@ -122,7 +122,7 @@ Sandboxes are a good place to experiment. Some regions block bots, and the bot w
 
 ### Asking what the bot sees
 
-Ask Claude "What's around DexterFrost?" or "Where am I compared to the bot?". Claude calls `describe_surroundings`, which reports the region and parcel, where you are (for example "8 m northeast, 3 m above"), other avatars, and nearby objects. For a closer look at one thing, ask "What is that chair?" and Claude calls `inspect_object` with its id.
+Ask Claude "What's around DexterFrost?" or "Where am I compared to the bot?". Claude calls `describe_surroundings`, which reports the region and parcel, where you are (for example "8 m northeast, 3 m above"), other avatars, and nearby objects. For a closer look at one thing, ask "What is that chair?" and Claude calls `inspect_object` with its id. Asking "What am I wearing?" or "What am I doing?" inspects your avatar: your animations, what you hold, and your attachments.
 
 Object names come from the region a moment after the bot asks for them, so the first description in a new place can list a few objects as unnamed. Asking again fills them in.
 

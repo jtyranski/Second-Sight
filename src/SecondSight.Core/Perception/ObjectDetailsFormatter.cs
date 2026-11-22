@@ -59,6 +59,9 @@ public static class ObjectDetailsFormatter
         return sb.ToString();
     }
 
+    public const string ClothingNote =
+        "Only attached items (mesh clothing, hair, accessories) can be seen by name. Older system clothing layers aren't visible to the bot.";
+
     public static string DescribeAvatar(SeenAvatar a, Vector3 me, bool isOwner, string? sittingOn)
     {
         var sb = new StringBuilder();
@@ -67,7 +70,28 @@ public static class ObjectDetailsFormatter
         sb.AppendLine(".");
         sb.Append($"Where: {SceneFormatter.Where(me, a)}");
         if (a.Sitting) sb.Append(sittingOn != null ? $", sitting on {sittingOn}" : ", sitting");
-        sb.Append('.');
+        sb.AppendLine(".");
+        if (a.Approximate)
+        {
+            sb.Append("They are beyond the bot's draw distance, so what they wear and do can't be seen.");
+            return sb.ToString();
+        }
+
+        var doing = a.Activity.Where(x => !(a.Sitting && x == "sitting")).ToList();
+        sb.AppendLine(doing.Count == 0 ? "Doing: nothing the bot can see." : $"Doing: {string.Join(", ", doing)}.");
+
+        var held = a.Worn.Where(w => w.Held).ToList();
+        if (held.Count > 0) sb.AppendLine($"Holding: {string.Join(", ", held)}.");
+        var worn = a.Worn.Where(w => !w.Held).ToList();
+        if (worn.Count == 0) sb.AppendLine("Wearing: no attachments the bot can see.");
+        else
+        {
+            sb.AppendLine($"Wearing ({worn.Count} attachment{(worn.Count == 1 ? "" : "s")}):");
+            foreach (var w in worn.Take(60)) sb.AppendLine($"- {w}");
+            if (worn.Count > 60) sb.AppendLine($"- ...and {worn.Count - 60} more.");
+        }
+        sb.AppendLine(ClothingNote);
+        sb.Append(SceneFormatter.UntrustedNote);
         return sb.ToString();
     }
 }

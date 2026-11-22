@@ -79,11 +79,17 @@ public sealed partial class BotSession
         var wantProps = objects.Take(maxObjects).Where(o => o.Name == null && o.Kind == SceneObjectKind.Object).Select(o => o.Id).ToList();
         if (sittingOnRoot != null && !_objectProperties.ContainsKey(sittingOnRoot.ID)) wantProps.Add(sittingOnRoot.ID);
         var wantNames = avatars.Where(a => a.Name == null).Select(a => a.Id).ToList();
+        // What nearby avatars hold, and which objects animate them.
+        foreach (var a in avatars.Where(a => !a.Approximate).OrderBy(a => Geometry.Distance(me, a.Position)).Take(20))
+        {
+            wantProps.AddRange(a.Worn.Where(w => w.Held && w.Name == null).Select(w => w.Id));
+            wantProps.AddRange(AnimationSources(sim, a.Id));
+        }
         var parcelTask = CurrentParcelAsync(client, sim, me, cancellationToken);
         await FetchAsync(client, sim, wantProps, wantNames, cancellationToken);
 
         if (wantProps.Count > 0) objects = NearbyObjects(sim, me, radius);
-        if (wantNames.Count > 0) avatars = AvatarsInRegion(client, sim);
+        if (wantNames.Count > 0 || wantProps.Count > 0) avatars = AvatarsInRegion(client, sim);
         var parcel = await parcelTask;
 
         var owner = _owner.Id is { } ownerId ? avatars.FirstOrDefault(a => a.Id == ownerId) : null;
@@ -120,7 +126,9 @@ public sealed partial class BotSession
             var avatar = AvatarsInRegion(client, sim).FirstOrDefault(a => a.Id == uuid);
             if (avatar != null)
             {
-                if (avatar.Name == null) await FetchAsync(client, sim, [], [uuid], cancellationToken);
+                var wanted = avatar.Worn.Where(w => w.Name == null).Select(w => w.Id).Concat(AnimationSources(sim, uuid)).ToList();
+                await FetchAsync(client, sim, wanted, avatar.Name == null ? [uuid] : [], cancellationToken);
+                avatar = AvatarsInRegion(client, sim).FirstOrDefault(a => a.Id == uuid) ?? avatar;
                 avatar = avatar with { Name = avatar.Name ?? NameOf(uuid) };
                 string? seat = null;
                 if (sim.ObjectsAvatars.Values.FirstOrDefault(a => a.ID == uuid) is { ParentID: not 0 } av && RootOf(sim, av.ParentID) is { } seatRoot)
@@ -197,7 +205,20 @@ public sealed partial class BotSession
     {
         var coarse = _coarse is { } c && c.RegionHandle == sim.Handle ? c.Positions : null;
         return SceneBuilder.Avatars(sim.ObjectsAvatars.Values.ToList(), coarse, client.Self.AgentID,
-            localId => sim.ObjectsPrimitives.TryGetValue(localId, out var p) ? p : null, NameOf);
+            localId => sim.ObjectsPrimitives.TryGetValue(localId, out var p) ? p : null, NameOf,
+            sim.ObjectsPrimitives.Values.ToList(), id => _objectProperties.TryGetValue(id, out var p) ? p.Name : null);
+    }
+
+    /// <summary>Objects (other than the avatar itself) that are playing animations on an avatar.</summary>
+    private IEnumerable<UUID> AnimationSources(Simulator sim, UUID avatarId)
+    {
+        var avatar = sim.ObjectsAvatars.Values.FirstOrDefault(a => a.ID == avatarId);
+        if (avatar == null) return [];
+        List<Animation> animations;
+        lock (avatar) animations = avatar.Animations?.ToList() ?? [];
+        return animations.Select(a => a.AnimationSourceObjectID)
+            .Where(id => id != UUID.Zero && id != avatarId && !_objectProperties.ContainsKey(id))
+            .Distinct().ToList();
     }
 
     /// <summary>The root prim of the object that <paramref name="localId"/> belongs to, if it is in view.</summary>
