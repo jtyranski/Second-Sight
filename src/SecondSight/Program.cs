@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SecondSight.Core.Chat;
 using SecondSight.Core.Config;
+using SecondSight.Core.Perception;
 using SecondSight.Core.Session;
 using SecondSight.Core.Travel;
 
@@ -26,6 +27,7 @@ builder.Services.AddSingleton<BotSession>();
 builder.Services.AddSingleton<IBotSession>(sp => sp.GetRequiredService<BotSession>());
 builder.Services.AddSingleton<IChatChannel>(sp => sp.GetRequiredService<BotSession>());
 builder.Services.AddSingleton<ITravel>(sp => sp.GetRequiredService<BotSession>());
+builder.Services.AddSingleton<IPerception>(sp => sp.GetRequiredService<BotSession>());
 
 builder.Services
     .AddMcpServer(o => o.ServerInfo = new() { Name = "second-sight", Version = BotSession.Version })

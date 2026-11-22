@@ -2,12 +2,13 @@ using LibreMetaverse;
 using Microsoft.Extensions.Logging;
 using SecondSight.Core.Chat;
 using SecondSight.Core.Config;
+using SecondSight.Core.Perception;
 using SecondSight.Core.Travel;
 
 namespace SecondSight.Core.Session;
 
 /// <summary>Owns the LibreMetaverse <see cref="GridClient"/>: login/logout, incoming chat, and sending chat.</summary>
-public sealed class BotSession : IBotSession, IChatChannel, ITravel, IAsyncDisposable
+public sealed partial class BotSession : IBotSession, IChatChannel, ITravel, IPerception, IAsyncDisposable
 {
     public const string Channel = "SecondSight";
     public static readonly string Version = typeof(BotSession).Assembly.GetName().Version?.ToString(3) ?? "0.1.0";
@@ -128,6 +129,7 @@ public sealed class BotSession : IBotSession, IChatChannel, ITravel, IAsyncDispo
             client.Self.ChatFromSimulator += OnChat;
             client.Self.IM += OnInstantMessage;
             client.Self.TeleportProgress += OnTeleportProgress;
+            AttachPerception(client);
             _client = client;
             _state = ConnectionState.LoggedIn;
             _logger.LogInformation("Logged in to {Region}", client.Network.CurrentSim?.Name);
@@ -493,6 +495,7 @@ public sealed class BotSession : IBotSession, IChatChannel, ITravel, IAsyncDispo
         client.Self.ChatFromSimulator -= OnChat;
         client.Self.IM -= OnInstantMessage;
         client.Self.TeleportProgress -= OnTeleportProgress;
+        DetachPerception(client);
     }
 
     private static string DescribeOwner(string owner) =>
