@@ -49,7 +49,8 @@ The bot can log in, chat with its owner, teleport, and describe what is around i
 
 ## Setup
 
-See [docs/setup.md](docs/setup.md) for Windows setup: installing .NET, configuring the bot account, and adding Second Sight to Claude.
+- Windows: [docs/setup.md](docs/setup.md) covers installing .NET, configuring the bot account, and adding Second Sight to Claude.
+- Linux: [docs/setup-linux.md](docs/setup-linux.md) covers the same steps, plus a checklist of live tests.
 
 ## Development
 

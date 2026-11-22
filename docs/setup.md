@@ -1,5 +1,7 @@
 # Setting up Second Sight on Windows 11
 
+On Linux, see [setup-linux.md](setup-linux.md).
+
 ## 1. Prepare the bot account
 
 1. Sign in to [secondlife.com](https://secondlife.com) as the bot account (DexterFrost).
