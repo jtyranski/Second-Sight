@@ -43,6 +43,8 @@ If you'd rather not keep the password in the file, leave `"Password"` empty and 
 [Environment]::SetEnvironmentVariable("SECONDSIGHT_PASSWORD", "your-password", "User")
 ```
 
+Message limits are set with `DailyMessageLimit` (default 500) and `MessagesPerMinute` (default 10) in the config file.
+
 Each setting can also be set with an environment variable: `SECONDSIGHT_USERNAME`, `SECONDSIGHT_PASSWORD`, `SECONDSIGHT_OWNER`, `SECONDSIGHT_START`, `SECONDSIGHT_AUTOLOGIN`. `SECONDSIGHT_CONFIG` points to a different config file.
 
 ## 5. Add Second Sight to Claude
@@ -92,7 +94,19 @@ claude mcp add second-sight -- C:\SecondSight\SecondSight.exe
 
 ## 6. Try it
 
-Ask Claude: "Log the Second Sight bot in and tell me where it is." Claude calls `login`, then `status`. When you're done, ask it to log the bot out.
+Ask Claude: "Log the Second Sight bot in and tell me where it is." Claude calls `login`, then `status`.
+
+To chat, stand near the bot in Second Life and ask Claude something like:
+
+> Chat with me in Second Life. Keep waiting for my messages and reply in local chat until I say goodbye.
+
+Claude then loops: it calls `wait_for_message`, reads what you said, answers with `say`, and waits again. You can also IM the bot. Claude Desktop asks before each tool call, so choose **Always allow** for the Second Sight tools to keep the conversation flowing.
+
+When you're done, ask Claude to log the bot out.
+
+## Activity log
+
+Everything you say to the bot, and everything it says, is logged by day in `%LOCALAPPDATA%\SecondSight\logs\activity-YYYY-MM-DD.log`.
 
 ## Troubleshooting
 

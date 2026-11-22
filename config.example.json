@@ -16,5 +16,13 @@
   "StartLocation": "last",
 
   // Log in as soon as Claude starts the MCP server.
-  "AutoLogin": false
+  "AutoLogin": false,
+
+  // The bot's own limits on chat lines and IMs it sends.
+  // Linden Lab allows at most 5,000 a day for all of one person's bots.
+  "DailyMessageLimit": 500,
+  "MessagesPerMinute": 10
+
+  // Where the activity log goes. Defaults to %LOCALAPPDATA%\SecondSight\logs.
+  // "ActivityLogDirectory": "C:\\SecondSight\\logs"
 }

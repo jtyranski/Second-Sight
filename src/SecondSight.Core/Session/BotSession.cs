@@ -1,11 +1,12 @@
 using LibreMetaverse;
 using Microsoft.Extensions.Logging;
+using SecondSight.Core.Chat;
 using SecondSight.Core.Config;
 
 namespace SecondSight.Core.Session;
 
-/// <summary>Owns the LibreMetaverse <see cref="GridClient"/> and the login/logout lifecycle.</summary>
-public sealed class BotSession : IBotSession, IAsyncDisposable
+/// <summary>Owns the LibreMetaverse <see cref="GridClient"/>: login/logout, incoming chat, and sending chat.</summary>
+public sealed class BotSession : IBotSession, IChatChannel, IAsyncDisposable
 {
     public const string Channel = "SecondSight";
     public static readonly string Version = typeof(BotSession).Assembly.GetName().Version?.ToString(3) ?? "0.1.0";
@@ -14,23 +15,35 @@ public sealed class BotSession : IBotSession, IAsyncDisposable
 
     private readonly BotConfig _config;
     private readonly ILogger<BotSession> _logger;
+    private readonly MessageInbox _inbox;
+    private readonly OutgoingLimiter _limiter;
+    private readonly ActivityLog _activity;
+    private readonly TimeProvider _time;
+    private readonly OwnerIdentity _owner;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     private GridClient? _client;
     private volatile ConnectionState _state = ConnectionState.LoggedOut;
-    private UUID? _ownerId;
     private string? _lastError;
 
-    public BotSession(BotConfig config, ILogger<BotSession> logger)
+    public BotSession(BotConfig config, MessageInbox inbox, OutgoingLimiter limiter, ActivityLog activity,
+        ILogger<BotSession> logger, TimeProvider? time = null)
     {
         _config = config;
+        _inbox = inbox;
+        _limiter = limiter;
+        _activity = activity;
         _logger = logger;
+        _time = time ?? TimeProvider.System;
+        _owner = OwnerIdentity.FromConfig(config.Owner);
     }
 
     public ConnectionState State => _state;
 
-    /// <summary>The owner's UUID once resolved. Later milestones use this to filter chat and IMs.</summary>
-    public UUID? OwnerId => _ownerId;
+    /// <summary>The owner's UUID once resolved. Chat and IMs are filtered by it.</summary>
+    public UUID? OwnerId => _owner.Id;
+
+    public string OwnerName => _owner.Name?.DisplayName ?? _config.Owner ?? "your owner";
 
     public async Task<SessionResult> LoginAsync(CancellationToken cancellationToken)
     {
@@ -46,6 +59,14 @@ public sealed class BotSession : IBotSession, IAsyncDisposable
 
             var name = AvatarName.Parse(_config.Username!);
             StartLocationParser.TryParse(_config.StartLocation, out var start, out _);
+
+            if (_client is { } stale)
+            {
+                // Left over from a dropped connection.
+                Detach(stale);
+                await stale.DisposeAsync();
+                _client = null;
+            }
 
             _state = ConnectionState.LoggingIn;
             _lastError = null;
@@ -80,9 +101,13 @@ public sealed class BotSession : IBotSession, IAsyncDisposable
                 return Fail($"Login failed: {reason}");
             }
 
+            _inbox.Clear();
+            client.Self.ChatFromSimulator += OnChat;
+            client.Self.IM += OnInstantMessage;
             _client = client;
             _state = ConnectionState.LoggedIn;
             _logger.LogInformation("Logged in to {Region}", client.Network.CurrentSim?.Name);
+            _activity.Write("login", $"Logged in to {client.Network.CurrentSim?.Name}");
 
             var ownerNote = await ResolveOwnerAsync(client, cancellationToken);
             return new(true, $"{GetStatus().Describe()}{ownerNote}");
@@ -108,7 +133,7 @@ public sealed class BotSession : IBotSession, IAsyncDisposable
                 return new(true, "Already logged out.");
 
             _state = ConnectionState.LoggingOut;
-            client.Network.Disconnected -= OnDisconnected;
+            Detach(client);
             try
             {
                 if (client.Network.Connected) await client.Network.LogoutAsync(cancellationToken);
@@ -122,6 +147,7 @@ public sealed class BotSession : IBotSession, IAsyncDisposable
                 await client.DisposeAsync();
                 _client = null;
                 _state = ConnectionState.LoggedOut;
+                _activity.Write("logout", "Logged out");
             }
             return new(true, "Logged out.");
         }
@@ -135,10 +161,14 @@ public sealed class BotSession : IBotSession, IAsyncDisposable
     {
         var client = _client;
         var ownerName = string.IsNullOrWhiteSpace(_config.Owner) ? null : DescribeOwner(_config.Owner);
-        var ownerId = _ownerId?.ToString();
+        var ownerId = _owner.Id?.ToString();
 
         if (client == null || _state != ConnectionState.LoggedIn)
-            return new BotStatus { State = _state, OwnerName = ownerName, OwnerId = ownerId, LastError = _lastError };
+            return new BotStatus
+            {
+                State = _state, OwnerName = ownerName, OwnerId = ownerId, LastError = _lastError,
+                MessagesSentToday = _limiter.SentToday, DailyMessageLimit = _limiter.DailyLimit,
+            };
 
         var self = client.Self;
         var pos = self.SimPosition;
@@ -153,7 +183,86 @@ public sealed class BotSession : IBotSession, IAsyncDisposable
             OwnerName = ownerName,
             OwnerId = ownerId,
             LastError = _lastError,
+            MessagesSentToday = _limiter.SentToday,
+            DailyMessageLimit = _limiter.DailyLimit,
         };
+    }
+
+    public Task<SessionResult> SayAsync(string text, ChatVolume volume, CancellationToken cancellationToken)
+    {
+        var type = volume switch
+        {
+            ChatVolume.Whisper => ChatType.Whisper,
+            ChatVolume.Shout => ChatType.Shout,
+            _ => ChatType.Normal,
+        };
+        return SendAsync(text, "said", (client, chunk) => client.Self.Chat(chunk, 0, type, false));
+    }
+
+    public Task<SessionResult> SendOwnerImAsync(string text, CancellationToken cancellationToken)
+    {
+        if (_client == null || _state != ConnectionState.LoggedIn)
+            return Task.FromResult(new SessionResult(false, "The bot is not logged in. Use the login tool first."));
+        if (_owner.Id is not { } ownerId)
+            return Task.FromResult(new SessionResult(false, $"Can't IM {OwnerName}: the owner's UUID isn't known yet. Check the Owner setting."));
+        return SendAsync(text, "im-to-owner", (client, chunk) => client.Self.InstantMessage(ownerId, chunk));
+    }
+
+    private Task<SessionResult> SendAsync(string text, string kind, Action<GridClient, string> send)
+    {
+        var client = _client;
+        if (client == null || _state != ConnectionState.LoggedIn || !client.Network.Connected)
+            return Task.FromResult(new SessionResult(false, "The bot is not logged in. Use the login tool first."));
+        if (string.IsNullOrWhiteSpace(text))
+            return Task.FromResult(new SessionResult(false, "Nothing to send: the message is empty."));
+
+        var chunks = MessageSplitter.Split(text);
+        if (!_limiter.TryReserve(chunks.Count, out var reason))
+        {
+            _activity.Write("blocked", $"{kind}: {reason}");
+            return Task.FromResult(new SessionResult(false, reason!));
+        }
+
+        foreach (var chunk in chunks)
+        {
+            send(client, chunk);
+            _activity.Write(kind, chunk);
+        }
+        var note = chunks.Count > 1 ? $" (sent as {chunks.Count} messages)" : "";
+        return Task.FromResult(new SessionResult(true, $"Sent{note}. {_limiter.SentToday} of {_limiter.DailyLimit} messages used today."));
+    }
+
+    private void OnChat(object? sender, ChatEventArgs e)
+    {
+        var client = _client;
+        if (client == null) return;
+        var message = MessageClassifier.FromLocalChat(e.Type, e.SourceType, e.AudibleLevel, e.FromName, e.SourceID,
+            e.Position, e.Message, client.Self.AgentID, client.Self.SimPosition, _owner, _time.GetLocalNow());
+        if (message == null) return;
+        _inbox.Add(message);
+        if (message.FromOwner) _activity.Write("heard-owner", message.Text);
+    }
+
+    private void OnInstantMessage(object? sender, InstantMessageEventArgs e)
+    {
+        var client = _client;
+        if (client == null) return;
+        var message = MessageClassifier.FromInstantMessage(e.IM, client.Self.AgentID, _owner, _time.GetLocalNow());
+        if (message == null)
+        {
+            if (e.IM.Dialog == InstantMessageDialog.MessageFromAgent && e.IM.FromAgentID != client.Self.AgentID)
+                _logger.LogInformation("Ignored IM from {Name} (not the owner)", e.IM.FromAgentName);
+            return;
+        }
+        _inbox.Add(message);
+        _activity.Write("im-from-owner", message.Text);
+    }
+
+    private void Detach(GridClient client)
+    {
+        client.Network.Disconnected -= OnDisconnected;
+        client.Self.ChatFromSimulator -= OnChat;
+        client.Self.IM -= OnInstantMessage;
     }
 
     private static string DescribeOwner(string owner) =>
@@ -162,12 +271,7 @@ public sealed class BotSession : IBotSession, IAsyncDisposable
     /// <summary>Looks up the owner's UUID by name, unless the config already gives a UUID.</summary>
     private async Task<string> ResolveOwnerAsync(GridClient client, CancellationToken cancellationToken)
     {
-        if (UUID.TryParse(_config.Owner ?? "", out var direct))
-        {
-            _ownerId = direct;
-            return "";
-        }
-        if (_ownerId != null) return "";
+        if (_owner.Id != null) return "";
 
         var owner = AvatarName.Parse(_config.Owner!);
         var queryId = UUID.Random();
@@ -187,7 +291,7 @@ public sealed class BotSession : IBotSession, IAsyncDisposable
             var finished = await Task.WhenAny(tcs.Task, Task.Delay(OwnerLookupTimeout, cancellationToken));
             if (finished == tcs.Task && tcs.Task.Result is { } id)
             {
-                _ownerId = id;
+                _owner.Id = id;
                 _logger.LogInformation("Owner {Owner} resolved to {Id}", owner.FullName, id);
                 return "";
             }
@@ -206,6 +310,7 @@ public sealed class BotSession : IBotSession, IAsyncDisposable
         _logger.LogWarning("Disconnected: {Reason} {Message}", e.Reason, e.Message);
         _lastError = $"Disconnected ({e.Reason}){(string.IsNullOrWhiteSpace(e.Message) ? "" : ": " + e.Message)}";
         _state = ConnectionState.LoggedOut;
+        _activity.Write("disconnected", _lastError);
     }
 
     private SessionResult Fail(string message)

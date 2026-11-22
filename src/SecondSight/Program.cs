@@ -2,6 +2,7 @@ using LibreMetaverse;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using SecondSight.Core.Chat;
 using SecondSight.Core.Config;
 using SecondSight.Core.Session;
 
@@ -16,8 +17,13 @@ builder.Logging.SetMinimumLevel(LogLevel.Information);
 
 var config = ConfigLoader.Load();
 builder.Services.AddSingleton(config);
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<MessageInbox>();
+builder.Services.AddSingleton(sp => new OutgoingLimiter(config.DailyMessageLimit, config.MessagesPerMinute, sp.GetRequiredService<TimeProvider>()));
+builder.Services.AddSingleton(sp => new ActivityLog(config.ActivityLogDirectory, sp.GetRequiredService<TimeProvider>()));
 builder.Services.AddSingleton<BotSession>();
 builder.Services.AddSingleton<IBotSession>(sp => sp.GetRequiredService<BotSession>());
+builder.Services.AddSingleton<IChatChannel>(sp => sp.GetRequiredService<BotSession>());
 
 builder.Services
     .AddMcpServer(o => o.ServerInfo = new() { Name = "second-sight", Version = BotSession.Version })
