@@ -130,6 +130,7 @@ public sealed partial class BotSession : IBotSession, IChatChannel, ITravel, IPe
             client.Self.IM += OnInstantMessage;
             client.Self.TeleportProgress += OnTeleportProgress;
             AttachPerception(client);
+            AttachSocial(client);
             _client = client;
             _state = ConnectionState.LoggedIn;
             _logger.LogInformation("Logged in to {Region}", client.Network.CurrentSim?.Name);
@@ -496,6 +497,7 @@ public sealed partial class BotSession : IBotSession, IChatChannel, ITravel, IPe
         client.Self.IM -= OnInstantMessage;
         client.Self.TeleportProgress -= OnTeleportProgress;
         DetachPerception(client);
+        DetachSocial(client);
     }
 
     private static string DescribeOwner(string owner) =>

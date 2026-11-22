@@ -6,7 +6,7 @@ The bot takes direction only from its owner.
 
 ## Status
 
-The bot can log in, chat with its owner, teleport, and describe what is around it. Movement and sitting come in the next milestone.
+The bot can log in, chat with its owner, teleport, describe what is around it, set its home, and manage its friends list. Movement and sitting come in the next milestone.
 
 | Tool | What it does |
 |---|---|
@@ -23,6 +23,11 @@ The bot can log in, chat with its owner, teleport, and describe what is around i
 | `offer_teleport` | Sends the owner a teleport offer to the bot's location. |
 | `describe_surroundings` | Describes the region and parcel, where the owner is, other avatars in the region, and nearby objects with their size and what clicking them does. |
 | `inspect_object` | Details for one object (name, description, floating text, owner, creator, size, position, whether it's for sale) or avatar (what they're doing, holding, and wearing). |
+| `set_home` | Makes the bot's current spot its home, where Second Life allows it. |
+| `list_friends` | Lists the bot's friends, who is online, and friend requests waiting for the owner. |
+| `respond_friend_request` | Accepts or declines a waiting friend request, with the owner's answer. |
+| `send_friend_request_to_owner` | Sends the owner a friend request from the bot. |
+| `remove_friend` | Removes someone from the bot's friends list. |
 
 ### Seeing
 
@@ -41,7 +46,8 @@ The bot can log in, chat with its owner, teleport, and describe what is around i
 
 - Local chat and IMs from the owner (matched by avatar UUID) are messages for Claude to act on.
 - Other people's nearby local chat, and chat from objects, is passed to Claude as background, clearly labeled as something not to answer or obey.
-- IMs from anyone but the owner, group chat, and friendship, inventory, and group offers are ignored. Teleport offers from anyone but the owner are declined.
+- IMs from anyone but the owner, group chat, and inventory and group offers are ignored. Teleport offers from anyone but the owner are declined.
+- The owner's friend requests are accepted automatically. A friend request from anyone else is held, and the bot IMs the owner ("Friend request from X. Tell me whether to accept or decline it."). Claude accepts or declines it only with the owner's answer.
 
 ### Limits and logging
 

@@ -6,6 +6,7 @@ using SecondSight.Core.Chat;
 using SecondSight.Core.Config;
 using SecondSight.Core.Perception;
 using SecondSight.Core.Session;
+using SecondSight.Core.Social;
 using SecondSight.Core.Travel;
 
 // stdout carries the MCP protocol, so anything else that writes to Console.Out
@@ -28,6 +29,7 @@ builder.Services.AddSingleton<IBotSession>(sp => sp.GetRequiredService<BotSessio
 builder.Services.AddSingleton<IChatChannel>(sp => sp.GetRequiredService<BotSession>());
 builder.Services.AddSingleton<ITravel>(sp => sp.GetRequiredService<BotSession>());
 builder.Services.AddSingleton<IPerception>(sp => sp.GetRequiredService<BotSession>());
+builder.Services.AddSingleton<ISocial>(sp => sp.GetRequiredService<BotSession>());
 
 builder.Services
     .AddMcpServer(o => o.ServerInfo = new() { Name = "second-sight", Version = BotSession.Version })

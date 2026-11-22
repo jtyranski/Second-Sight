@@ -23,6 +23,14 @@ public sealed record AvatarName(string First, string Last)
         };
     }
 
+    public static bool TryParse(string? name, out AvatarName result)
+    {
+        result = null!;
+        if (string.IsNullOrWhiteSpace(name)) return false;
+        try { result = Parse(name); return true; }
+        catch (ArgumentException) { return false; }
+    }
+
     /// <summary>Full name as Second Life shows it, e.g. "Jimmi Tiponi" or "DexterFrost Resident".</summary>
     public string FullName => $"{First} {Last}";
 
