@@ -23,6 +23,9 @@ public sealed class ActivityLog
 
     public string Directory => _directory;
 
+    /// <summary>The last error writing the log, if any. Shown by the diagnostics tool.</summary>
+    public string? LastError { get; private set; }
+
     public string CurrentFile => Path.Combine(_directory, $"activity-{_time.GetLocalNow():yyyy-MM-dd}.log");
 
     public void Write(string kind, string text)
@@ -37,7 +40,7 @@ public sealed class ActivityLog
                 File.AppendAllText(CurrentFile, line);
             }
         }
-        catch (IOException) { }
-        catch (UnauthorizedAccessException) { }
+        catch (IOException e) { LastError = e.Message; }
+        catch (UnauthorizedAccessException e) { LastError = e.Message; }
     }
 }

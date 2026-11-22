@@ -126,6 +126,8 @@ Everything you say to the bot, and everything it says, is logged by day in `%LOC
 
 ## Troubleshooting
 
+- **Something isn't working** Ask Claude to "run the Second Sight diagnostics tool". It shows the running version, where the config and activity log are, whether your UUID was found, and the last IMs and teleport offers the bot received and what it did with them.
+
 - **Login failed: ... password ...** The username or password is wrong. The username is the account name (`DexterFrost`), not a display name.
 - **Could not find the owner avatar** The bot logged in, but the name search for the owner came back empty. Check the spelling of `Owner`, or set it to your avatar's UUID.
 - **Logs** The server writes its logs to stderr. Claude Desktop saves them in a `logs` folder next to `claude_desktop_config.json`, in `mcp-server-second-sight.log`.

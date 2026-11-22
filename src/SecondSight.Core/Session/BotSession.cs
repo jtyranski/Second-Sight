@@ -21,6 +21,7 @@ public sealed class BotSession : IBotSession, IChatChannel, ITravel, IAsyncDispo
     private readonly ActivityLog _activity;
     private readonly TimeProvider _time;
     private readonly OwnerIdentity _owner;
+    private readonly RecentEvents _recent;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     private GridClient? _client;
@@ -38,6 +39,26 @@ public sealed class BotSession : IBotSession, IChatChannel, ITravel, IAsyncDispo
         _logger = logger;
         _time = time ?? TimeProvider.System;
         _owner = OwnerIdentity.FromConfig(config.Owner);
+        _recent = new RecentEvents(_time);
+    }
+
+    /// <summary>Troubleshooting details: version, files, owner, and recent raw events.</summary>
+    public string Diagnostics()
+    {
+        var lines = new List<string>
+        {
+            $"Second Sight version: {typeof(BotSession).Assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false).OfType<System.Reflection.AssemblyInformationalVersionAttribute>().FirstOrDefault()?.InformationalVersion ?? Version}",
+            $"Program: {Environment.ProcessPath}",
+            $"Config file: {Config.ConfigLoader.ResolvedPath}",
+            $"Activity log: {_activity.CurrentFile}" + (_activity.LastError is { } err ? $" (last write failed: {err})" : ""),
+            $"State: {_state}",
+            $"Owner setting: {_config.Owner ?? "(not set)"}; owner UUID: {_owner.Id?.ToString() ?? "not resolved"}",
+            $"Messages sent today: {_limiter.SentToday} of {_limiter.DailyLimit}",
+        };
+        var recent = _recent.Snapshot();
+        lines.Add(recent.Count == 0 ? "Recent IM/teleport events: none since start." : "Recent IM/teleport events:");
+        lines.AddRange(recent.Select(r => "  " + r));
+        return string.Join("\n", lines);
     }
 
     public ConnectionState State => _state;
@@ -250,6 +271,7 @@ public sealed class BotSession : IBotSession, IChatChannel, ITravel, IAsyncDispo
     {
         var client = _client;
         if (client == null) return;
+        _recent.Add($"IM {e.IM.Dialog} from {e.IM.FromAgentName} ({e.IM.FromAgentID}){(e.IM.FromAgentID == _owner.Id ? " [owner]" : "")}");
         if (HandleLure(client, e.IM)) return;
         var message = MessageClassifier.FromInstantMessage(e.IM, client.Self.AgentID, _owner, _time.GetLocalNow());
         if (message == null)
@@ -265,14 +287,15 @@ public sealed class BotSession : IBotSession, IChatChannel, ITravel, IAsyncDispo
     /// <summary>Handles teleport offers and requests. Returns true when the IM was one.</summary>
     private bool HandleLure(GridClient client, InstantMessage im)
     {
-        switch (LureDecision.Decide(im, client.Self.AgentID, _owner))
+        var action = LureDecision.Decide(im, client.Self.AgentID, _owner);
+        if (action != LureAction.None) _recent.Add($"  -> {action}");
+        switch (action)
         {
             case LureAction.AcceptOffer:
                 _logger.LogInformation("Accepting teleport offer from {Name}", im.FromAgentName);
                 _activity.Write("teleport-accept", $"Accepted teleport offer from {im.FromAgentName}");
-                _lureTeleportPending = true;
-                client.Self.TeleportLureRespond(im.FromAgentID, im.IMSessionID, true);
                 AddEvent($"{im.FromAgentName} sent a teleport offer. Accepted it; teleporting now.");
+                _ = AcceptLureAsync(client, im);
                 return true;
 
             case LureAction.DeclineOffer:
@@ -303,8 +326,69 @@ public sealed class BotSession : IBotSession, IChatChannel, ITravel, IAsyncDispo
         }
     }
 
+    /// <summary>How long to wait for the server to act on an accepted offer before teleporting directly.</summary>
+    private static readonly TimeSpan LureAcceptTimeout = TimeSpan.FromSeconds(6);
+
+    /// <summary>
+    /// Accepts the owner's teleport offer the standard way. If the server doesn't start the teleport
+    /// soon, teleports straight to the location the offer points to instead.
+    /// </summary>
+    private async Task AcceptLureAsync(GridClient client, InstantMessage im)
+    {
+        try
+        {
+            var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            void OnProgress(object? sender, TeleportEventArgs e)
+            {
+                if (e.Status != TeleportStatus.None) started.TrySetResult();
+            }
+
+            client.Self.TeleportProgress += OnProgress;
+            _lureTeleportPending = true;
+            try
+            {
+                client.Self.TeleportLureRespond(im.FromAgentID, im.IMSessionID, true);
+                if (await Task.WhenAny(started.Task, Task.Delay(LureAcceptTimeout, _time)) == started.Task) return;
+            }
+            finally
+            {
+                client.Self.TeleportProgress -= OnProgress;
+            }
+
+            _lureTeleportPending = false;
+            if (!LureLocation.TryParse(im.BinaryBucket, out var location))
+            {
+                _recent.Add("  -> server didn't respond to accept; offer had no readable location");
+                AddEvent("The teleport offer was accepted, but the server didn't move the bot, and the offer didn't say where it leads. " +
+                         "Ask your owner for their location and use the teleport tool.");
+                return;
+            }
+
+            _recent.Add($"  -> server didn't respond to accept; teleporting directly to handle {location!.RegionHandle} {location.Position}");
+            _logger.LogInformation("Lure accept got no response; teleporting directly to {Handle} {Pos}", location.RegionHandle, location.Position);
+            bool ok;
+            try
+            {
+                ok = await client.Self.TeleportAsync(location.RegionHandle, location.Position, CancellationToken.None);
+            }
+            catch (Exception e)
+            {
+                _logger.LogWarning(e, "Direct teleport after lure threw");
+                ok = false;
+            }
+            var result = TeleportResult(client, ok, $"to {im.FromAgentName}'s location");
+            AddEvent(result.Message);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Accepting teleport offer failed");
+            AddEvent($"Accepting the teleport offer failed: {e.Message}");
+        }
+    }
+
     private void OnTeleportProgress(object? sender, TeleportEventArgs e)
     {
+        _recent.Add($"Teleport {e.Status}{(string.IsNullOrWhiteSpace(e.Message) ? "" : ": " + e.Message)}");
         if (!_lureTeleportPending) return;
         switch (e.Status)
         {
