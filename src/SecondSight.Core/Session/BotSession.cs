@@ -294,9 +294,8 @@ public sealed class BotSession : IBotSession, IChatChannel, ITravel, IAsyncDispo
             case LureAction.AcceptOffer:
                 _logger.LogInformation("Accepting teleport offer from {Name}", im.FromAgentName);
                 _activity.Write("teleport-accept", $"Accepted teleport offer from {im.FromAgentName}");
-                _lureTeleportPending = true;
-                client.Self.TeleportLureRespond(im.FromAgentID, im.IMSessionID, true);
                 AddEvent($"{im.FromAgentName} sent a teleport offer. Accepted it; teleporting now.");
+                _ = AcceptLureAsync(client, im);
                 return true;
 
             case LureAction.DeclineOffer:
@@ -324,6 +323,66 @@ public sealed class BotSession : IBotSession, IChatChannel, ITravel, IAsyncDispo
 
             default:
                 return false;
+        }
+    }
+
+    /// <summary>How long to wait for the server to act on an accepted offer before teleporting directly.</summary>
+    private static readonly TimeSpan LureAcceptTimeout = TimeSpan.FromSeconds(6);
+
+    /// <summary>
+    /// Accepts the owner's teleport offer the standard way. If the server doesn't start the teleport
+    /// soon, teleports straight to the location the offer points to instead.
+    /// </summary>
+    private async Task AcceptLureAsync(GridClient client, InstantMessage im)
+    {
+        try
+        {
+            var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            void OnProgress(object? sender, TeleportEventArgs e)
+            {
+                if (e.Status != TeleportStatus.None) started.TrySetResult();
+            }
+
+            client.Self.TeleportProgress += OnProgress;
+            _lureTeleportPending = true;
+            try
+            {
+                client.Self.TeleportLureRespond(im.FromAgentID, im.IMSessionID, true);
+                if (await Task.WhenAny(started.Task, Task.Delay(LureAcceptTimeout, _time)) == started.Task) return;
+            }
+            finally
+            {
+                client.Self.TeleportProgress -= OnProgress;
+            }
+
+            _lureTeleportPending = false;
+            if (!LureLocation.TryParse(im.BinaryBucket, out var location))
+            {
+                _recent.Add("  -> server didn't respond to accept; offer had no readable location");
+                AddEvent("The teleport offer was accepted, but the server didn't move the bot, and the offer didn't say where it leads. " +
+                         "Ask your owner for their location and use the teleport tool.");
+                return;
+            }
+
+            _recent.Add($"  -> server didn't respond to accept; teleporting directly to handle {location!.RegionHandle} {location.Position}");
+            _logger.LogInformation("Lure accept got no response; teleporting directly to {Handle} {Pos}", location.RegionHandle, location.Position);
+            bool ok;
+            try
+            {
+                ok = await client.Self.TeleportAsync(location.RegionHandle, location.Position, CancellationToken.None);
+            }
+            catch (Exception e)
+            {
+                _logger.LogWarning(e, "Direct teleport after lure threw");
+                ok = false;
+            }
+            var result = TeleportResult(client, ok, $"to {im.FromAgentName}'s location");
+            AddEvent(result.Message);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Accepting teleport offer failed");
+            AddEvent($"Accepting the teleport offer failed: {e.Message}");
         }
     }
 
