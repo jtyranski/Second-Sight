@@ -12,6 +12,7 @@ The bot can log in, chat with its owner, and teleport. Perception, movement, and
 |---|---|
 | `login` | Logs the bot in using the local config. Reports where it arrived. |
 | `logout` | Logs the bot out. |
+| `diagnostics` | Troubleshooting: version, config and log file locations, owner UUID, and the last raw IMs and teleport events. |
 | `status` | Reports whether the bot is logged in, its region and position, whether it is sitting or flying, its owner, and how many messages it has sent today. |
 | `say` | Says something in local chat (whisper, normal, or shout). |
 | `send_im` | Sends an IM to the owner. The bot can't IM anyone else. |

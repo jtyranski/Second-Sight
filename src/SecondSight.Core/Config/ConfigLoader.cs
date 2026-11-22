@@ -17,12 +17,16 @@ public static class ConfigLoader
         AllowTrailingCommas = true,
     };
 
+    /// <summary>The config file path used by the last <see cref="Load"/>, and whether it existed.</summary>
+    public static string? ResolvedPath { get; private set; }
+
     /// <summary>Loads the config file (if present) and applies environment variable overrides.</summary>
     public static BotConfig Load(Func<string, string?>? getEnv = null)
     {
         getEnv ??= Environment.GetEnvironmentVariable;
         var path = getEnv(ConfigPathVariable);
         if (string.IsNullOrWhiteSpace(path)) path = DefaultPath;
+        ResolvedPath = File.Exists(path) ? path : path + " (not found)";
 
         var config = File.Exists(path)
             ? JsonSerializer.Deserialize<BotConfig>(File.ReadAllText(path), JsonOptions) ?? new BotConfig()
